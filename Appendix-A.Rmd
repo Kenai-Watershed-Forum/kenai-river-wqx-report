@@ -1,16 +1,21 @@
---- 
+---
 author: "Benjamin Meyer, Kenai Watershed Forum"
 date: "`r Sys.Date()`"
 ---
 
-# (APPENDIX) Appendix {-}
+# (APPENDIX) Appendix {.unnumbered}
 
 # Appendix: Data Uplift to EPA WQX
 
 ## Introduction
 
-Prior to analysis and interpretation of water quality data, we will ensure that all data meeting QA/QC standards outlined in the QAPP is accessible in the appropriate repository. Water quality data for this project is stored in the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET.
+Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the project Quality Assurance Project Plan (QAPP) [@kenaiwatershedforum2020] is accessible in the appropriate repository. Water quality data for this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET.
 
+Section B10 of [@kenaiwatershedforum2020] describes data management details and responsible parties for each step of the data pipeline.in
+
+### 2021 Water Quality Data
+
+Water quality data generated from the Kenai River Baseline Water Quality Monitoring (KRBWQM) program was submitted to the Soldotna office of the Alaska Department of Environmental Conservation in January 2022.
 
 ```{r, notes}
 
@@ -20,7 +25,7 @@ Prior to analysis and interpretation of water quality data, we will ensure that 
 
 # audit existing data in WQX
 
-# attempt to download missing data from  AQWMS
+# attempt to download missing data from  AQWMS, then upload to EPA WQX
 
 # if not available, reshape data from shared drive to uplift to EPA WQX (big task)
 
@@ -29,8 +34,6 @@ Prior to analysis and interpretation of water quality data, we will ensure that 
 <br>
 
 ## 2021 Baseline Water Quality Data
-
-
 
 ```{r, other notes, include = F}
 

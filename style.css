@@ -12,3 +12,13 @@ pre {
 pre code {
   white-space: inherit;
 }
+
+/* Bibliography / references */
+.csl-entry {
+  margin-top: 1em;
+}
+
+.hanging-indent .csl-entry {
+  padding-left: 1em;
+  text-indent: -1em;
+}

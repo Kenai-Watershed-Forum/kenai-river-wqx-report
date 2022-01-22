@@ -1,11 +1,11 @@
 # Study Area
 
-### Description
+## Description
 
-### Figures/maps
+## Figures/maps
 
-### Sampling sites descriptions/photos
+## Sampling sites descriptions/photos
 
-#### Tributary Sites
+### Tributary Sites
 
-#### Main Stem Sites
+### Main Stem Sites
