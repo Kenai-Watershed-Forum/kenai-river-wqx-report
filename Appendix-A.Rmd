@@ -101,7 +101,8 @@ z <- sgs21 %>%
   mutate_all(funs(str_replace(., "Diss|Dis", ""))) %>%
   
   # retain info about duplicate sample status in separate column
-  mutate(sample_condition = str_extract(sgs21$`Client Sample`,"DUP"))
+  mutate(sample_condition = str_extract(sgs21$`Client Sample`,"DUP")) %>%
+  mutate(`Client Sample` = str_replace(`Client Sample`, "DUP", ""))
 
 
 
