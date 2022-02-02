@@ -44,7 +44,7 @@ Show Code Below
 
 </summary>
 
-```{r, 2021 AQWMS formatting}
+```{r, 2021 AQWMS formatting, eval = F}
 
 # clear environment
 
@@ -78,7 +78,7 @@ aqwms21_sitenames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx"
 
 # write 2021 sgs site names to an excel file
 site_match_table_path <- "other/input/AQWMS/site_names_matching_table.xlsx"
-write_xlsx(sgs21_sitenames, path) 
+write.xlsx(sgs21_sitenames, site_match_table_path) 
 
 #
 wb <- loadWorkbook(site_match_table_path)
