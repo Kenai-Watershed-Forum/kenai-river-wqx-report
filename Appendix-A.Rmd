@@ -24,7 +24,7 @@ Section B10 of the 2020 QAPP describes data management details and responsible p
 
 Water quality data generated from the Kenai River Baseline Water Quality Monitoring (KRBWQM) program was submitted to the Soldotna office of the Alaska Department of Environmental Conservation (ADEC) in January 2022 using the project-specific AQWMS Template provided by ADEC.
 
-A crip
+
 
 #### 2021 Water Quality Data AQWMS Formatting
 
@@ -35,6 +35,9 @@ The code script below assembles water quality data from the three analytic labor
 -   Soldotna Wastewater Treatment Plant (Soldotna, AK)
 
 -   Taurianen Engineering (Soldotna, AK)
+
+
+##### Spring 2021
 
 <details>
 
@@ -53,8 +56,10 @@ library(tidyverse)
 library(readxl)
 library(openxlsx)
 library(data.table)
+library(stringr)
 
-# SGS data
+##################### SGS data #####################
+
 ## Reformat SGS data downloaded from their server client (SGS Engage) to match AQWMS template
 
 ### spring 2021 SGS data
@@ -63,11 +68,11 @@ library(data.table)
 sgs21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.xlsx", sheet = "Report", skip = 4)
 
 
-# upon visual inspection, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies). To address this, we will manually generate a match table csv file that we can use to rectify
+# upon visual inspection, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies). To address this, we will manually generate a match table csv file that we can use to rectify this issue.
 
 # generate list of unique site names from 2021 SGS data
 sgs21_sitenames <- data.table(unique(sgs21$`Client Sample`)) %>%
-  # filter out names containing the suffixes "DUP" (duplicate) or Diss/Dis (Dissolved metals sample)
+  # filter out names containing the suffixes "DUP" (duplicate) or Diss/Dis (Dissolved metals sample) since we only want a list of unique sites
   filter(!grepl(c("Diss|Dis|DUP"),V1)) %>%
   rename("sgs_sitenames" = "V1")
 
@@ -80,14 +85,26 @@ aqwms21_sitenames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx"
 site_match_table_path <- "other/input/AQWMS/site_names_matching_table.xlsx"
 write.xlsx(sgs21_sitenames, site_match_table_path) 
 
-#
+# create an excel file with two sheets: a.) SGS site names, and b.) AQWMS site names
 wb <- loadWorkbook(site_match_table_path)
 addWorksheet(wb,"Sheet2")
 writeData(wb,"Sheet2",aqwms21_sitenames)
 saveWorkbook(wb,site_match_table_path,overwrite = TRUE)
 
 
-#### working here 1/27/2022
+# Using these two lists, we will manually create a new file titled "site_names_matching_table_manual_edit.xlsx" and match up the two disparate naming systems
+
+# modify SGS "client sample" column so that it contains site name info only, and not sample details (e.g. "Diss" or "DUP")
+
+z <- sgs21 %>%
+  # fully remove the suffix "Diss" because this info is already in the "Analysis" column (solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
+  mutate_all(funs(str_replace(., "Diss|Dis", ""))) %>%
+  
+  # retain info about duplicate sample status in separate column
+  mutate(sample_condition = str_extract(sgs21$`Client Sample`,"DUP"))
+
+
+
 
 ### 1st step:::: make sure that monitoring list locations matches those currently match those in DEC AQWMS database (AWQMS public login: https://awqms2.goldsystems.com/Login.aspx, username akpublic, no password)
 
