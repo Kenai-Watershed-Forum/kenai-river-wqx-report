@@ -39,18 +39,18 @@ The code script below assembles water quality data from the three analytic labor
 
 ##### Spring 2021
 
-Download Original Spring 2021 Lab Results Files: (Click Link)
-
+Download Original Spring 2021 SGS Lab Results Files: (Click Link)
 
 <details>
 
 <summary>
 
-Show Spring 2021 Code Below
+Show Code used to Prepare 2021 (Spring & Summer) SGS Results for AQWMS Template
 
 </summary>
 
 ```{r, 2021 AQWMS formatting, eval = F}
+
 
 # clear environment
 rm(list=ls())
@@ -61,6 +61,13 @@ library(readxl)
 library(openxlsx)
 library(data.table)
 library(stringr)
+library(magrittr)
+
+# Spring 2021 sampling date
+spring21_sample_date <- "5/11/2021"
+
+# Summer 2021 Sampling Date
+summer21_sample_date <-"8/27/2021"
 
 ##################### SGS data #####################
 
@@ -69,28 +76,92 @@ library(stringr)
 ### spring 2021 SGS data
 
 #### read in results downloaded from SGS 
-sgs21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.xlsx", sheet = "Report", skip = 4)
+spring_sgs21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.xlsx", sheet = "Report", skip = 4) %>%
+  mutate(`Lab Sample` = as.double(`Lab Sample`)) %>%
+  # assign field sample date
+  mutate(sample_date = spring21_sample_date) %>%
+  clean_names()
+
+### summer 2021 SGS data
+
+#### read in results downloaded from SGS 
+summer_sgs21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/SGS_results_Summer2021.xlsx", sheet = "Report", skip = 4) %>%
+  # filter out extraneous info
+  filter(!`Client Sample` %in%c("Sample Comments","Client Sample Id"),
+         !`Matrix` %in% "200.7 Total Ca, Fe, Mg were analyzed by ALS of Kelso, WA.",
+         !is.na(`Lab Sample`)) %>%
+  # remove blank columns
+  select(-starts_with("...")) %>%
+  # assign field sample date
+  mutate(sample_date = summer21_sample_date) %>%
+  clean_names()
+
+# transform column types to prep for join
+summer_sgs21 %<>%
+  mutate(lab_sample = as.double(lab_sample),
+         reporting_limit = as.double(reporting_limit))
+
+# append spring and summer 2021 results
+sgs21 <- bind_rows(spring_sgs21,summer_sgs21)
+rm(spring_sgs21,summer_sgs21)
 
 
-# upon visual inspection, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies). To address this, we will manually generate a match table csv file that we can use to rectify this issue.
+# upon visual inspection, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
 
-# generate list of unique site names from 2021 SGS data
-sgs21_sitenames <- data.table(unique(sgs21$`Client Sample`)) %>%
+#### address spelling/format issues and inconsistent sample/site names #####
+
   
-  # remove from site names the text containing the suffixes "DUP" (duplicate) or Diss/Dis (Dissolved metals sample) since we only want a list of unique sites
-  mutate_all(funs(str_replace(., "Diss|Dis|DUP", ""))) %>%
-  rename("sgs_sitenames" = "V1") %>%
+# move info about duplicate sample status in separate column
+sgs21 %<>%
+  mutate(sample_condition = str_extract(client_sample,"DUP")) %>%
+  mutate(client_sample = str_replace(client_sample, "DUP", ""))
   
+  
+# remove from site names the text containing the suffixes "DUP" (duplicate) or Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
+sgs21 %<>%  
+  mutate(client_sample = (str_replace(client_sample, "Diss|Dis|DUP", ""))) %>%
+
+
   # address the one stubborn site name still containing "Diss"
-  mutate(sgs_sitenames = case_when(
-    sgs_sitenames == "RM0-No Name Creek  Diss" ~ "RM0-No Name Creek",
-    TRUE ~ sgs_sitenames
-  ))
-           
+  mutate(client_sample = case_when(
+    client_sample == "RM0-No Name Creek  Diss" ~ "RM0-No Name Creek",
+    TRUE ~ client_sample)) %>%
+  
+# We need to remove white spaces, apostrophes, and dashes. Join functions such as "left_join" are often uncooperative with these types of strings
+  
+  # remove trailing white spaces
+  mutate(client_sample = str_trim(client_sample,"right")) %>%
+  
+  # make remaining white spaces underscores
+  mutate(client_sample = gsub("\\s+","_",client_sample)) %>%
+  
+  # replace dashes with underscores
+  mutate(client_sample = gsub("\\-","_",client_sample)) %>%
+  
+  # replace multiple underscores with single
+  mutate(client_sample = gsub("\\__","_",client_sample)) %>%
+  
+  # remove apostrophes
+   mutate(client_sample = gsub("\\'","",client_sample))
+  
+  
+# for summer samples, need to address "Trip blanks"; look @ field forms to figureout which ones went with which group ...(no name (KWF) vs others (USFWS))
+
+
+
+
+
+
+
+# In preparation for a join to AQWMS table, we will manually generate a match table csv file that we can use 
+
+## generate list of unique site names from 2021 SGS data
+sgs21_sitenames <- data.table(unique(sgs21$client_sample)) 
+  
 
 # generate list of unique site names from 2021 AQWMS template
 aqwms21_sitenames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "Monitoring Locations") %>%
-  select("Monitoring Location Name") %>%
+  select("Monitoring Location Name", "Monitoring Location ID") %>%
   distinct()
 
 # write 2021 sgs site names to an excel file
@@ -104,37 +175,55 @@ writeData(wb,"Sheet2",aqwms21_sitenames)
 saveWorkbook(wb,site_match_table_path,overwrite = TRUE)
 
 
-# Using these two lists, we will manually create a new file titled "site_names_matching_table_manual_edit.xlsx" and manually match up the two disparate naming systems. Performed by B Meyer January 2022. 
+# Using these two tables, we will manually create a new file titled "site_names_matching_table_manual_edit.xlsx" and manually match up the two disparate naming systems. Performed by B Meyer January 2022. 
 
-# modify SGS "client sample" column so that it contains site name info only, and not sample details (e.g. "Diss" or "DUP")
 
-sgs21 <- sgs21 %>%
-  # fully remove the suffix "Diss" because this info is already in the "Analysis" column (solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
-  mutate_all(funs(str_replace(., "Diss|Dis", ""))) %>%
-  
-  # retain info about duplicate sample status in separate column
-  mutate(sample_condition = str_extract(sgs21$`Client Sample`,"DUP")) %>%
-  mutate(`Client Sample` = str_replace(`Client Sample`, "DUP", ""))
-
-# append "Monitoring Location ID" info from WQX to spring 2021 data
+# append "Monitoring Location Name" and "Monitoring Location ID" info from WQX to spring 2021 SGS data
 
 ## read in site names join table
 sitenames21_match <- read_excel("other/input/AQWMS/site_names_matching_table_manual_edit.xlsx") %>%
-  select(`Monitoring Location Name`,sgs_sitenames)
+  select(`Monitoring Location Name`,`Monitoring Location ID`,sgs_sitenames) %>%
+  rename(client_sample = sgs_sitenames)
 
-sgs21 <- sgs21 %>% rename(sgs_sitenames = `Client Sample`) 
+# append monitoring location names
+sgs21 %<>%
+  left_join(sitenames21_match, by = "client_sample") %>%
+  clean_names()
 
+
+## append monitoring location info (*)
+
+
+
+# create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
 z <- sgs21 %>%
-  left_join(sitenames21_match, by = "sgs_sitenames") %>%
-  filter(is.na(`Monitoring Location Name`))
+  mutate(
+    # `Monitoring Location ID` - already present, lowercase
+    `Activity Media Name` = "Water",
+    `Activity Media Subdivision Name` = "Surface Water",
+    ####`Activity ID` = paste0(monitoring_location_id,"-",sample_date,"-",analyte),
+    # append sample condition (e.g. DUP) if applicable
+    `Activity ID` = ifelse(is.na(sample_condition),`Activity ID`, paste0(`Activity ID`,"-",sample_condition)),
+    `Activity Latitude` = "*",
+    `Activity Longitude` = "*",
+    `Activity Source Map Scale` = "*",
+    `Activity Type` = case_when(
+      sample_condition == "DUP" ~ "Quality Control Field Replicate Msr/Obs",
+      TRUE ~ "Field Msr/Obs"),
+    `Characteristic Name` = analyte)
+    
+
+    
+    
+    
+
+# check out example from other WQP downoad
+z1 <- read.csv("other/input/wqp_data/narrowresult.csv")
+
+z1$Act
 
 
-### SGS site/sample names are very messy and are currently joining for only 136/214 rows
-z <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.xlsx", sheet = "Report", skip = 4) 
-
-
-## try replacing spaces and dashes with underscores???
 
 
 
@@ -147,17 +236,25 @@ z <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 
 
 
 
+```
+</details>
 
+<br>
+
+```{r}
 # Taurianen data
 ## Reformat Taurianen data to match AQWMS template
 
+```
+
+```{r}
 # Soldotna Wastewater Treatment Plant
 ## Reformat SWWTP data to match AQWMS template
 
 
 ```
 
-</details>
+
 
 
 
