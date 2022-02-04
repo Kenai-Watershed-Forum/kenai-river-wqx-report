@@ -111,21 +111,24 @@ rm(spring_sgs21,summer_sgs21)
 #### address spelling/format issues and inconsistent sample/site names #####
 
   
-# move info about duplicate sample status in separate column
+# move info about duplicate sample and/or sample blank status into separate column
 sgs21 %<>%
-  mutate(sample_condition = str_extract(client_sample,"DUP")) %>%
-  mutate(client_sample = str_replace(client_sample, "DUP", ""))
+  mutate(sample_condition = case_when(
+    grepl("Blank",client_sample) ~ "Blank",
+    grepl("DUP",client_sample) ~ "DUP")) %>%
+  # remove "DUP" designation from client_sample column
+  mutate(client_sample = str_replace(client_sample, "DUP", "")) 
+
   
-  
-# remove from site names the text containing the suffixes "DUP" (duplicate) or Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
+# remove from "client_sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
 sgs21 %<>%  
   mutate(client_sample = (str_replace(client_sample, "Diss|Dis|DUP", ""))) %>%
-
 
   # address the one stubborn site name still containing "Diss"
   mutate(client_sample = case_when(
     client_sample == "RM0-No Name Creek  Diss" ~ "RM0-No Name Creek",
     TRUE ~ client_sample)) %>%
+  
   
 # We need to remove white spaces, apostrophes, and dashes. Join functions such as "left_join" are often uncooperative with these types of strings
   
@@ -142,11 +145,12 @@ sgs21 %<>%
   mutate(client_sample = gsub("\\__","_",client_sample)) %>%
   
   # remove apostrophes
-   mutate(client_sample = gsub("\\'","",client_sample))
+  mutate(client_sample = gsub("\\'","",client_sample))
   
   
-# for summer samples, need to address "Trip blanks"; look @ field forms to figureout which ones went with which group ...(no name (KWF) vs others (USFWS))
+# for summer samples, need to address "Trip blanks"; look @ field forms to figure out which ones went with which group ...(no name (KWF) vs others (USFWS))
 
+# sent email to alexandra daniel w/ SGS on 2/4/2022 to inquire
 
 
 
