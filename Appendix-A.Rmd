@@ -111,9 +111,6 @@ summer_sgs21 %<>%
 sgs21 <- bind_rows(spring_sgs21,summer_sgs21)
 rm(spring_sgs21,summer_sgs21)
 
-
-
-
 ```
 
 ```{r, als21}
@@ -141,14 +138,21 @@ als21 <- bind_rows(spring_als21,summer_als21)
 rm(spring_als21,summer_als21)
 
 # prep ALS data to be joined with SGS data
-z <- als21 %>%
+als21 %<>%
   rename(client_sample = client_id,
-         lab_sample = lab_id
-         ) %>%
-  select(-mdl,-qc1,-data_entry,-qc2)
+         lab_sample = lab_id,
+         reporting_limit = mrl,
+         analysis = method) %>%
+  select(-qc1,-data_entry,-qc2) %>%
+  # transform column types as needed for join in next step
+  transform(lab_sample = as.double(lab_sample),
+            analysis = as.character(analysis),
+            result = as.character(result))
 
-### working here 2/7/2022
+# join SGS data with ALS data
+sgs21 <- bind_rows(sgs21,als21)
 
+rm(als21)
 
 ```
 
@@ -211,7 +215,9 @@ sgs21 %<>%
   
 # seperate result qualifiers (U, J, B) in to a new column
 sgs21 %<>%
-  mutate(qualifier = str_extract(result, "[aA-zZ]+")) %>%
+  mutate(qualifier = str_extract(result,"[aA-zZ]+")) %>%
+  mutate(result = str_remove(result,"[aA-zZ]+")) %>%
+  
   # again replace multiple underscores with single
   mutate(client_sample = gsub("\\__","_",client_sample)) 
 
@@ -264,6 +270,9 @@ sitenames21_match <- read_excel("other/input/AQWMS/site_names_matching_table_man
 sgs21 %<>%
   left_join(sitenames21_match, by = "client_sample") %>%
   clean_names() 
+
+
+#### need to address site names with cree or _ working here 2/7/22
 
 ```
 
