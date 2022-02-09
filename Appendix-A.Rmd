@@ -176,6 +176,9 @@ sgs21 %<>%
 # remove from "client_sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
 sgs21 %<>%  
   mutate(client_sample = (str_replace(client_sample, "Diss|Dis|DUP", ""))) %>%
+  
+  # also remove "Diss" suffix from "analysis" column
+  mutate(analysis = (str_replace(analysis, "Diss", ""))) %>%
 
   # address the one stubborn site name still containing "Diss"
   mutate(client_sample = case_when(
@@ -271,10 +274,21 @@ sgs21 %<>%
   left_join(sitenames21_match, by = "client_sample") %>%
   clean_names() 
 
+# remove
 
-#### need to address site names with cree or _ working here 2/7/22
 
 ```
+
+
+```{r}
+
+# Result Analytical Method Context
+
+# matching
+
+```
+
+
 
 
 ```{r}
@@ -282,14 +296,14 @@ sgs21 %<>%
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
 z <- sgs21 %>%
+  # following left to right across columns
   mutate(
-    # `Monitoring Location ID` - already present, (lowercase)
+    # `Monitoring Location ID` = rename "monitoring_location_id"
     `Activity Media Name` = "Water",
     `Activity Media Subdivision Name` = "Surface Water",
     `Activity ID` = case_when(
       is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte),
       !is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte,"-",sample_condition)),
-
     # append sample condition (e.g. DUP) if applicable
     `Activity ID` = ifelse(is.na(sample_condition),`Activity ID`, paste0(`Activity ID`,"-",sample_condition)),
     #`Activity Latitude` = "*",
@@ -299,23 +313,33 @@ z <- sgs21 %>%
       sample_condition == "DUP" ~ "Quality Control Field Replicate Msr/Obs",
       sample_condition == "Blank" ~ "Quality Control Sample-Trip Blank",
       TRUE ~ "Field Msr/Obs"),
-    `Characteristic Name` = analyte)
+    #`Characteristic Name` = rename "analyte"
+    #`Result Analytical Method ID` = rename analysis
+    `Result Analytical Method Context` = 
+
+    ) %>%
+  # rename cols already present
+  
     
 
     
     
     
 
-# check out example from other WQP downoad
+
+
+# get all column names from AQWMS template
+aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "Permitted Values")
+
+# reorder columns using read in list from aqwms template
+
+
+
+```
+
+```{r, eval = F}
+# check out example from other WQP download
 z1 <- read.csv("other/input/wqp_data/narrowresult.csv")
-
-z1$Act
-
-
-
-
-
-
 
 ### 1st step:::: make sure that monitoring list locations matches those currently match those in DEC AQWMS database (AWQMS public login: https://awqms2.goldsystems.com/Login.aspx, username akpublic, no password)
 
