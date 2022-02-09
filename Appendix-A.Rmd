@@ -304,7 +304,6 @@ z <- sgs21 %>%
     `Activity ID` = case_when(
       is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte),
       !is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte,"-",sample_condition)),
-    # append sample condition (e.g. DUP) if applicable
     `Activity ID` = ifelse(is.na(sample_condition),`Activity ID`, paste0(`Activity ID`,"-",sample_condition)),
     #`Activity Latitude` = "*",
     #`Activity Longitude` = "*",
@@ -313,9 +312,22 @@ z <- sgs21 %>%
       sample_condition == "DUP" ~ "Quality Control Field Replicate Msr/Obs",
       sample_condition == "Blank" ~ "Quality Control Sample-Trip Blank",
       TRUE ~ "Field Msr/Obs"),
+    #`Activity Depth/Height Measure` = *
+    #`Activity Depth/Height Unit` = *
+    #`Activity Bottom Depth/Height Measure` = *
+    #`Activity Bottom Depth/Height Unit = *
+    #`Activity Relative Depth Name = *
+    #`Activity Comment` = *
     #`Characteristic Name` = rename "analyte"
     #`Result Analytical Method ID` = rename analysis
-    `Result Analytical Method Context` = 
+    #`Result Analytical Method Context` = sent question to S Apsens 2/8/2022, likely need to match in prior code chunk
+    #`Method Speciation` = *
+    #`Result Value` =  rename "result"
+    #`Result Unit` = rename "unit"
+    #`Result Qualifier` = rename "qualifier"
+    #`Result Weight Basis` = 
+    
+    # working here 2/8/2022, dozen or so more columns to go
 
     ) %>%
   # rename cols already present
