@@ -65,7 +65,7 @@ library(magrittr)
 library(janitor)
 
 
-##################### Assign 2021 Sample Dates #####################
+##################### Assign 2021 Field Sample Dates #####################
 
 # Spring 2021 sampling date
 spring21_sample_date <- "5/11/2021"
@@ -108,10 +108,16 @@ summer_sgs21 %<>%
          reporting_limit = as.double(reporting_limit))
 
 # append spring and summer 2021 results
-sgs21 <- bind_rows(spring_sgs21,summer_sgs21)
+sgs21 <- bind_rows(spring_sgs21,summer_sgs21) %>%
+  # add lab name
+  mutate(lab_name = "SGS North America, Anchorage, Alaska") %>%
+  # make lab sample column character
+  transform(lab_sample = as.character(lab_sample))
+
 rm(spring_sgs21,summer_sgs21)
 
 ```
+
 
 ```{r, als21}
 
@@ -145,14 +151,19 @@ als21 %<>%
          analysis = method) %>%
   select(-qc1,-data_entry,-qc2) %>%
   # transform column types as needed for join in next step
-  transform(lab_sample = as.double(lab_sample),
+  transform(lab_sample = as.character(lab_sample),
             analysis = as.character(analysis),
-            result = as.character(result))
+            result = as.character(result)) %>%
+  # add lab name
+  mutate(lab_name = "ALS Environmental - Kelso Laboratory",
+         # assign matric type
+         matrix = "Water (Surface, Eff., Ground)")
 
 # join SGS data with ALS data
-sgs21 <- bind_rows(sgs21,als21)
+sgs21 <- bind_rows(sgs21,als21) 
 
 rm(als21)
+
 
 ```
 
@@ -177,8 +188,10 @@ sgs21 %<>%
 sgs21 %<>%  
   mutate(client_sample = (str_replace(client_sample, "Diss|Dis|DUP", ""))) %>%
   
-  # also remove "Diss" suffix from "analysis" column
-  mutate(analysis = (str_replace(analysis, "Diss", ""))) %>%
+  # remove "Diss" suffix and "EP" prefix from "analysis" column
+  mutate(analysis = str_replace(analysis, "Diss", "")) %>%
+  # note trailing space after "EP200.8 "
+  mutate(analysis = str_replace(analysis,"EP200.8 ","200.8")) %>%
 
   # address the one stubborn site name still containing "Diss"
   mutate(client_sample = case_when(
@@ -275,17 +288,47 @@ sgs21 %<>%
   clean_names() 
 
 # remove
-
+rm(sgs21_sitenames,aqwms21_sitenames,sitenames21_match)
 
 ```
 
 
 ```{r}
 
-# Result Analytical Method Context
+######################## "Result Analytical Method Context" name rectification ########
 
-# matching
+# In the AQWMS template, the EPA names that will go in the column "Result Analytical Method ID" do not exactly match the names provided by the laboratory (SGS). After communicating with SGS on 2/8/2022, we are able to cross-walk between the two naming systems. These matches are documented in the excel file "analysis_code_matching_table.xlsx."
 
+# assign "Result Analytical Method ID" and "Result Analytical Method Context" to dataset using matching table
+
+# read in matching table
+analysis_code_matching_table <- read_excel("other/input/AQWMS/analysis_code_matching_table.xlsx") %>%
+  select(-Comments,-`EPA Name`) %>%
+  clean_names() %>%
+  rename(analysis = sgs_analysis_code) %>%
+  # remove "EP" prefix from method "EP200.8"
+  mutate(analysis = str_replace(analysis,"EP200.8","200.8"))
+  
+
+# read in AQWMS Analytical Methods list
+aqwms_analytical_methods <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "Analytical Methods") %>%
+  select("ID","Context Code") %>%
+  clean_names() %>%
+  rename(epa_analysis_id = id) 
+
+# join two tables above
+epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching_table, by = "epa_analysis_id") %>%
+  filter(!context_code %in% c("USEPA Rev 5.4",
+                              "APHA (1997)",
+                              "APHA (1999)")) 
+
+# join EPA analysis IDs and context codes to overall dataset
+sgs21 %<>%
+  left_join(epa_analysis_codes, by = "analysis")
+
+#"EP200.8 Diss" remains in analysis column, wth ...
+
+rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 ```
 
 
@@ -312,22 +355,31 @@ z <- sgs21 %>%
       sample_condition == "DUP" ~ "Quality Control Field Replicate Msr/Obs",
       sample_condition == "Blank" ~ "Quality Control Sample-Trip Blank",
       TRUE ~ "Field Msr/Obs"),
-    #`Activity Depth/Height Measure` = *
-    #`Activity Depth/Height Unit` = *
-    #`Activity Bottom Depth/Height Measure` = *
-    #`Activity Bottom Depth/Height Unit = *
-    #`Activity Relative Depth Name = *
-    #`Activity Comment` = *
+    # All samples are surface grab samples. Depths are assigned across the board here as 6 inches (~15 cm) 
+    `Activity Depth/Height Measure` = 15,
+    # Next three column not applicable for surface grab samples
+    `Activity Depth/Height Unit` = "cm",
+    `Activity Bottom Depth/Height Measure` = "",
+    `Activity Bottom Depth/Height Unit` = "",
+    `Activity Relative Depth Name` = "",
+    #`Activity Comment` = rename "note
     #`Characteristic Name` = rename "analyte"
-    #`Result Analytical Method ID` = rename analysis
-    #`Result Analytical Method Context` = sent question to S Apsens 2/8/2022, likely need to match in prior code chunk
+    #`Result Analytical Method ID` = rename "epa_analysis_id"
+    #`Result Analytical Method Context` = rename "context_code"
     #`Method Speciation` = *
     #`Result Value` =  rename "result"
     #`Result Unit` = rename "unit"
     #`Result Qualifier` = rename "qualifier"
-    #`Result Weight Basis` = 
-    
-    # working here 2/8/2022, dozen or so more columns to go
+    `Result Weight Basis` = "Sampled",
+    `Statistical Base Code` = "",
+    #`Result Sample Fraction` = need to assign based on sample collection type
+    #`Result Value Type` = do actual in most cases, ask DEC about preference for blank correction
+    #`Result Comment` = ""
+    `Sample Collection Method ID` = "",
+    `Equipment ID` = "Water Bottle",
+    #`Result Detection Condition` = assign based on result qualifiers
+    #
+    # working here 2/9/2022
 
     ) %>%
   # rename cols already present
