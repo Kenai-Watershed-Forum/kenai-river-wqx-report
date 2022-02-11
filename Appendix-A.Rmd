@@ -28,7 +28,7 @@ Water quality data generated from the Kenai River Baseline Water Quality Monitor
 
 #### 2021 Water Quality Data AQWMS Formatting
 
-The code script below assembles water quality data from the three analytic laboratories that partnered with Kenai Watershed Forum for this project in 2021:
+The code scripts below assembles water quality data from the three analytic laboratories that partnered with Kenai Watershed Forum for this project in 2021:
 
 -   SGS Laboratories (Anchorage, AK)
 
@@ -36,21 +36,25 @@ The code script below assembles water quality data from the three analytic labor
 
 -   Taurianen Engineering (Soldotna, AK)
 
+<br>
 
-##### Spring 2021
+***
 
-Download Original Spring 2021 SGS Lab Results Files: (Click Link)
+
+##### Metals/Nutrients Lab Results (SGS Labs)
+
+Download Original 2021 Metals/Nutrients Lab Results (Click Link)
 
 <details>
 
 <summary>
 
-Show Code used to Prepare 2021 (Spring & Summer) SGS Results for AQWMS Template
+*Show/Hide Code used to Prepare 2021 Metals/Nutrients Results*
 
 </summary>
 
 
-```{r, 2021 AQWMS formatting}
+```{r, 2021 AQWMS formatting for SGS}
 
 # clear environment
 rm(list=ls())
@@ -63,9 +67,10 @@ library(data.table)
 library(stringr)
 library(magrittr)
 library(janitor)
+library(hms)
 
 
-##################### Assign 2021 Field Sample Dates #####################
+# Assign 2021 Field Sample Dates 
 
 # Spring 2021 sampling date
 spring21_sample_date <- "5/11/2021"
@@ -73,9 +78,12 @@ spring21_sample_date <- "5/11/2021"
 # Summer 2021 Sampling Date
 summer21_sample_date <-"8/27/2021"
 
+################################################################################################################
+######################################### Read in  and Clean SGS/ALS Data ######################################
+################################################################################################################
 
-######################################### Read in  and Clean SGS Data ######################################
 
+############################ Part A: SGS Data Read In #############################
 
 ## Reformat SGS data downloaded from their server client (SGS Engage) to match AQWMS template
 
@@ -116,12 +124,12 @@ sgs21 <- bind_rows(spring_sgs21,summer_sgs21) %>%
 
 rm(spring_sgs21,summer_sgs21)
 
-```
 
 
-```{r, als21}
 
-###################### ALS Data #############################
+
+
+###################### Part B: ALS Data Read In #############################
 
 ## SGS subcontracted analyses of Ca, Fe, and Mg to ALS laboratories (Kelso, WA). These results are not included in the spreadsheet download from SGS engage and were entered manually in to seperate spring and summer "ALS" named spreadsheets
 
@@ -165,12 +173,12 @@ sgs21 <- bind_rows(sgs21,als21)
 rm(als21)
 
 
-```
 
 
-```{r}
 
-############### Address spelling/format issues and inconsistent sample/site names ######################
+
+
+############### Part C: Address spelling/format issues and inconsistent sample/site names ######################
 
 # upon visual inspection, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
 
@@ -237,18 +245,13 @@ sgs21 %<>%
   # again replace multiple underscores with single
   mutate(client_sample = gsub("\\__","_",client_sample)) 
 
-```
 
 
 
 
 
 
-
-
-```{r}
-
-############## Prepare SGS Location/Site Names ##########################
+############## Part D: Prepare SGS/ALS Location/Site Names ##########################
 
 # In preparation for a join to AQWMS table, we will manually generate a match table csv file that we can use 
 
@@ -262,7 +265,7 @@ aqwms21_sitenames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx"
   distinct()
 
 # write 2021 sgs site names to an excel file
-site_match_table_path <- "other/input/AQWMS/site_names_matching_table.xlsx"
+site_match_table_path <- "other/input/AQWMS/sgs_site_names_matching_table.xlsx"
 write.xlsx(sgs21_sitenames, site_match_table_path) 
 
 # create an excel file with two sheets: a.) SGS site names, and b.) AQWMS site names
@@ -272,13 +275,13 @@ writeData(wb,"Sheet2",aqwms21_sitenames)
 saveWorkbook(wb,site_match_table_path,overwrite = TRUE)
 
 
-# Using these two tables, we will manually create a new file titled "site_names_matching_table_manual_edit.xlsx" and manually match up the two disparate naming systems. Performed by B Meyer January 2022. 
+# Using these two tables, we will manually create a new file titled "sgs_site_names_matching_table_manual_edit.xlsx" and manually match up the two disparate naming systems. Performed by B Meyer January 2022. 
 
 
 # append "Monitoring Location Name" and "Monitoring Location ID" info from WQX to spring 2021 SGS data
 
 ## read in site names join table
-sitenames21_match <- read_excel("other/input/AQWMS/site_names_matching_table_manual_edit.xlsx") %>%
+sitenames21_match <- read_excel("other/input/AQWMS/sgs_site_names_matching_table_manual_edit.xlsx") %>%
   select(`Monitoring Location Name`,`Monitoring Location ID`,sgs_sitenames) %>%
   rename(client_sample = sgs_sitenames)
 
@@ -287,15 +290,18 @@ sgs21 %<>%
   left_join(sitenames21_match, by = "client_sample") %>%
   clean_names() 
 
-# remove
+# remove dfs
 rm(sgs21_sitenames,aqwms21_sitenames,sitenames21_match)
 
-```
+# remove old "client_sample"column
+sgs21 %<>% select(-client_sample)
 
 
-```{r}
 
-######################## "Result Analytical Method Context" name rectification ########
+
+
+
+######################## Part E: "Result Analytical Method Context" name rectification ######################
 
 # In the AQWMS template, the EPA names that will go in the column "Result Analytical Method ID" do not exactly match the names provided by the laboratory (SGS). After communicating with SGS on 2/8/2022, we are able to cross-walk between the two naming systems. These matches are documented in the excel file "analysis_code_matching_table.xlsx."
 
@@ -326,22 +332,144 @@ epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching
 sgs21 %<>%
   left_join(epa_analysis_codes, by = "analysis")
 
-#"EP200.8 Diss" remains in analysis column, wth ...
 
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 ```
 
+</details>
 
+<br>
+
+***
+
+##### Fecal Coliform Lab Results (Soldotna Wastewater Treatment Plant/Taurianen Engineering)
+
+Download Original 2021 Fecal Coliform Lab Results (Click Link)
+
+<details>
+
+<summary>
+
+*Show/Hide Code used to Prepare 2021 Fecal Coliform Results* 
+
+</summary>
 
 
 ```{r}
 
+############################################################################################################
+##################################### Read in  and Clean SWWTP / Taurianen FC Data #########################
+############################################################################################################
+
+########################### Part A: SWWTP FC Data Read In #####################################################
+swwtp_spring21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls", skip = 11) %>%
+  clean_names() %>%
+
+## fix site naming and terminology
+
+# move info about duplicate sample and/or sample blank status into separate column
+  mutate(sample_condition = case_when(
+    grepl("BLANK",sample_location_rm) ~ "Lab Blank",
+    grepl("DUP",sample_location_rm) ~ "DUP",
+    grepl("POSITIVE",sample_location_rm) ~ "Positive Control")) %>%
+  # remove "BLANK", and "POSITIVE designation from sample_location column
+  mutate(sample_location_rm = (str_replace(sample_location_rm, "BLANK|POSITIVE", ""))) 
+
+# remove "DUP" from site name column and trim white spaces in site name column
+swwtp_spring21 %<>%
+  mutate(sample_location_rm = str_remove(sample_location_rm,"DUP")) %>%
+  mutate(sample_location_rm = str_trim(sample_location_rm,"right"))
+
+
+# address different site naming systems
+# use manually generated matching table
+# read in matching table and match
+swwtp_spring21_site_matching <- read_excel("other/input/AQWMS/swwtp_site_names_matching_table_manual_edit.xlsx") 
+
+# join
+swwtp_spring21 %<>%  
+  full_join(swwtp_spring21_site_matching) %>%
+  select(-sample_location_rm)
+
+rm(swwtp_spring21_site_matching)
+
+## fix times and dates
+swwtp_spring21 %<>%
+  # lab processing time/date
+  mutate(analysis_time_in = as_hms(time_in),
+         analysis_date_in = spring21_sample_date) %>%
+  select(-time_in,-time_out) %>%
+  # field sample time/date
+  mutate(time_sampled = as_hms(time_sampled),
+         sample_date = spring21_sample_date)
+  
+
+
+## rename existing column names and create new ones to match sgs21 data format at end of prior code chunk
+z <- swwtp_spring21 %>% 
+  rename(lab_sample = dish_number,
+         colony_count_100_ml = colony_count_100m_l) %>%
+  mutate(note = paste0("Lab analysis volume = ",ml," mL")) %>%
+  select(-ml,-colony_count)
+
+## working here 2/10/2022
+
+
+
+
+
+
+
+########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
+swwtp_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal_Coliform_Results_Spreadsheet.xlsx", skip = 3) %>%
+  clean_names()
+
+```
+
+</details>
+
+<br>
+
+
+
+***
+
+##### Total Dissolved Solids Lab Results (Soldotna Wastewater Treatment Plant (SWWTP))
+
+Download Original 2021 Total Dissolved Solids Lab Results (Click Link)
+
+<details>
+
+<summary>
+
+*Show/Hide Code used to Prepare 2021 Total Dissolved Solids Results* 
+
+</summary>
+
+
+```{r}
+# SWWTP data
+## Reformat TSS data to match AQWMS template
+
+```
+
+</details>
+
+
+
+
+```{r, eval = F, echo = F}
+# remove "client sample"
+
+
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
 z <- sgs21 %>%
-  # following left to right across columns
+  # Proceeding left to right across columns of AQWMS template
+  # Mutate new column or rename existing column as needed
+  
+  rename(`Monitoring Location ID` = "monitoring_location_id") %>%
   mutate(
-    # `Monitoring Location ID` = rename "monitoring_location_id"
     `Activity Media Name` = "Water",
     `Activity Media Subdivision Name` = "Surface Water",
     `Activity ID` = case_when(
@@ -378,8 +506,23 @@ z <- sgs21 %>%
     `Sample Collection Method ID` = "",
     `Equipment ID` = "Water Bottle",
     #`Result Detection Condition` = assign based on result qualifiers
-    #
-    # working here 2/9/2022
+    #`Result Detection Limit Type` = 
+    #`Result Detection Limit Value` = 
+    #`Result Detection Limit Unit` = 
+    #`Result Detection Limit Type` = 
+    #`Result Detection Limit Value` = 
+    #`Result Detection Limit Unit` = 
+    #`Laboratory Accreditation Indicator` = 
+    #`Laboratory Name` = rename
+    #`Laboratory Sample ID` = 
+    #`Analysis Start Date` = 
+    #`Analysis Start Time` = 
+    #`Biological Intent` = 
+    #`Subject Taxonomic Name` =
+    #`Thermal Preservative` = 
+    #`Sample Container Type` = 
+    #`Sample Container Color` = 
+    #`Chemical Preservative` = 
 
     ) %>%
   # rename cols already present
@@ -387,10 +530,6 @@ z <- sgs21 %>%
     
 
     
-    
-    
-
-
 
 # get all column names from AQWMS template
 aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "Permitted Values")
@@ -401,7 +540,7 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
 
 ```
 
-```{r, eval = F}
+```{r, eval = F, echo = F}
 # check out example from other WQP download
 z1 <- read.csv("other/input/wqp_data/narrowresult.csv")
 
@@ -410,22 +549,6 @@ z1 <- read.csv("other/input/wqp_data/narrowresult.csv")
 
 
 
-
-
-```
-</details>
-
-<br>
-
-```{r}
-# Taurianen data
-## Reformat Taurianen data to match AQWMS template
-
-```
-
-```{r}
-# Soldotna Wastewater Treatment Plant
-## Reformat SWWTP data to match AQWMS template
 
 
 ```
