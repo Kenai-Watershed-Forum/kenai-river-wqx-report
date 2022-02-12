@@ -361,7 +361,7 @@ Download Original 2021 Fecal Coliform Lab Results (Click Link)
 ##################################### Read in  and Clean SWWTP / Taurianen FC Data #########################
 ############################################################################################################
 
-########################### Part A: SWWTP FC Data Read In #####################################################
+########################### Part A: SWWTP FC Data Read In ##################################################
 swwtp_spring21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls", skip = 11) %>%
   clean_names() %>%
 
@@ -406,13 +406,30 @@ swwtp_spring21 %<>%
 
 
 ## rename existing column names and create new ones to match sgs21 data format at end of prior code chunk
-z <- swwtp_spring21 %>% 
+swwtp_spring21 %<>% 
   rename(lab_sample = dish_number,
-         colony_count_100_ml = colony_count_100m_l) %>%
-  mutate(note = paste0("Lab analysis volume = ",ml," mL")) %>%
-  select(-ml,-colony_count)
+         result = colony_count_100m_l) %>%
+  mutate(note = paste0("Lab analysis volume = ",ml," mL"),
+         matrix = "Water (Surface, Eff., Ground)",
+         analysis = "9222 D ~ Membrane filtration test for fecal coliforms",
+         analyte = "Fecal Coliform",
+         unit = "cfu/100ml",
+         # value from 2019 QAPP, pg 17
+         reporting_limit = 1.0,
+         lab_name = "Soldotna Wastewater Treatment Plant",
+         mdl = "",
+         note = "",
+         qualifier = "",
+         epa_analysis_id = "9222D",
+         context_code = "APHA" ) %>%
+  clean_names() %>%
+  select(-ml,-colony_count) %>%
+  # transform to prep for bind with sgs21
+  transform(lab_sample = as.character(lab_sample),
+            mdl = as.double(mdl))
 
-## working here 2/10/2022
+## working here 2/11/2022
+dat <- bind_rows(sgs21,swwtp_spring21)
 
 
 
@@ -422,7 +439,19 @@ z <- swwtp_spring21 %>%
 
 ########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
 swwtp_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal_Coliform_Results_Spreadsheet.xlsx", skip = 3) %>%
-  clean_names()
+  clean_names() %>%
+  
+
+
+## fix site naming and terminology
+
+# move info about duplicate sample and/or sample blank status into separate column
+  mutate(sample_condition = case_when(
+    grepl("DUP",sample_location) ~ "DUP")) %>%
+  # remove "DUP" designation from sample_location column
+  mutate(sample_location = (str_replace(sample_location, "_DUP", ""))) %>%
+  # trim white spaces in site name column
+  mutate(sample_location = str_trim(sample_location,"right"))
 
 ```
 
@@ -542,7 +571,8 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
 
 ```{r, eval = F, echo = F}
 # check out example from other WQP download
-z1 <- read.csv("other/input/wqp_data/narrowresult.csv")
+z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
+  filter(CharacteristicName == "Fecal Coliform")
 
 ### 1st step:::: make sure that monitoring list locations matches those currently match those in DEC AQWMS database (AWQMS public login: https://awqms2.goldsystems.com/Login.aspx, username akpublic, no password)
 
