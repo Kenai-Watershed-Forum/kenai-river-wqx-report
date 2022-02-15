@@ -428,10 +428,12 @@ swwtp_spring21 %<>%
   transform(lab_sample = as.character(lab_sample),
             mdl = as.double(mdl))
 
+
+
 ## working here 2/11/2022
 dat <- bind_rows(sgs21,swwtp_spring21)
 
-
+################## ghet site name match
 
 
 
