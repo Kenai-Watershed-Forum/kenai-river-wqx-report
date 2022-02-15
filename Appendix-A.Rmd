@@ -68,6 +68,7 @@ library(stringr)
 library(magrittr)
 library(janitor)
 library(hms)
+library(lubridate)
 
 
 # Assign 2021 Field Sample Dates 
@@ -334,6 +335,20 @@ sgs21 %<>%
 
 
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
+
+
+
+######################## Part F: Assign lab analysis in/out dates ######################
+
+# TBD if necessary
+
+
+########################## Miscellaneous Steps #########################################
+
+# rectify select colum classes
+
+sgs21 %<>%
+  transform(sample_date = mdy(sample_date))
 ```
 
 </details>
@@ -393,15 +408,20 @@ swwtp_spring21 %<>%
 
 rm(swwtp_spring21_site_matching)
 
-## fix times and dates
+
+## fix lab analysis times and dates
 swwtp_spring21 %<>%
   # lab processing time/date
   mutate(analysis_time_in = as_hms(time_in),
-         analysis_date_in = spring21_sample_date) %>%
+         analysis_date_in = mdy(spring21_sample_date),
+         analysis_time_out = as_hms(time_out),
+         # see file "other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls for out analysis date
+         analysis_date_out = ymd("2021-05-12")) %>%
   select(-time_in,-time_out) %>%
-  # field sample time/date
-  mutate(time_sampled = as_hms(time_sampled),
-         sample_date = spring21_sample_date)
+  transform(time_sampled = as_hms(time_sampled)) %>%
+  # field sample date and time
+  mutate(time_sampled = as_hms(time_sampled), 
+         sample_date = mdy(spring21_sample_date))
   
 
 
@@ -414,7 +434,7 @@ swwtp_spring21 %<>%
          analysis = "9222 D ~ Membrane filtration test for fecal coliforms",
          analyte = "Fecal Coliform",
          unit = "cfu/100ml",
-         # value from 2019 QAPP, pg 17
+         # reporting limit value from 2019 QAPP, pg 17
          reporting_limit = 1.0,
          lab_name = "Soldotna Wastewater Treatment Plant",
          mdl = "",
@@ -430,10 +450,10 @@ swwtp_spring21 %<>%
 
 
 
-## working here 2/11/2022
+## join SGS 2021 data to Spring 2021 Fecal Coliform data from SWWTP
 dat <- bind_rows(sgs21,swwtp_spring21)
 
-################## ghet site name match
+
 
 
 
@@ -442,19 +462,31 @@ dat <- bind_rows(sgs21,swwtp_spring21)
 ########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
 swwtp_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal_Coliform_Results_Spreadsheet.xlsx", skip = 3) %>%
   clean_names() %>%
+  select(-qc1,-data_entry,-qc2) %>%
   
-
-
-## fix site naming and terminology
-
-# move info about duplicate sample and/or sample blank status into separate column
+## move info about duplicate sample and/or sample blank status into separate column
   mutate(sample_condition = case_when(
     grepl("DUP",sample_location) ~ "DUP")) %>%
   # remove "DUP" designation from sample_location column
   mutate(sample_location = (str_replace(sample_location, "_DUP", ""))) %>%
   # trim white spaces in site name column
-  mutate(sample_location = str_trim(sample_location,"right"))
+  mutate(sample_location = str_trim(sample_location,"right")) %>%
+  
+## add known info about times/dates
+  mutate(sample_date = mdy(summer21_sample_date),
+         analysis_date_in = mdy(summer21_sample_date),
+         analysis_time_in = as_hms(time_relinquished),
+         analysis_date_out = ,
+         analysis_time_out = )
 
+
+################ working here 2/14/22
+
+
+
+## fix site naming and terminology
+z <- swwtp_summer21 %>%
+  
 ```
 
 </details>
@@ -496,17 +528,22 @@ Download Original 2021 Total Dissolved Solids Lab Results (Click Link)
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
 z <- sgs21 %>%
-  # Proceeding left to right across columns of AQWMS template
+  # Proceeding left to right across columns of AWQMS template
   # Mutate new column or rename existing column as needed
   
   rename(`Monitoring Location ID` = "monitoring_location_id") %>%
   mutate(
     `Activity Media Name` = "Water",
     `Activity Media Subdivision Name` = "Surface Water",
+    # create activity ID name conditionally if condition(s) present
     `Activity ID` = case_when(
       is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte),
       !is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte,"-",sample_condition)),
     `Activity ID` = ifelse(is.na(sample_condition),`Activity ID`, paste0(`Activity ID`,"-",sample_condition)),
+    #`Activity Start Date` = "*",
+    #`Activity Start Time` = "*",
+    #`Activity End Date` = "*",
+    #`Activity End Time` = "*",
     #`Activity Latitude` = "*",
     #`Activity Longitude` = "*",
     #`Activity Source Map Scale` = "*",
@@ -516,8 +553,8 @@ z <- sgs21 %>%
       TRUE ~ "Field Msr/Obs"),
     # All samples are surface grab samples. Depths are assigned across the board here as 6 inches (~15 cm) 
     `Activity Depth/Height Measure` = 15,
-    # Next three column not applicable for surface grab samples
     `Activity Depth/Height Unit` = "cm",
+    # Next three column not applicable for surface grab samples
     `Activity Bottom Depth/Height Measure` = "",
     `Activity Bottom Depth/Height Unit` = "",
     `Activity Relative Depth Name` = "",
@@ -555,15 +592,17 @@ z <- sgs21 %>%
     #`Sample Container Color` = 
     #`Chemical Preservative` = 
 
-    ) %>%
+    )
   # rename cols already present
   
-    
+   
 
     
 
 # get all column names from AQWMS template
-aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "Permitted Values")
+aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "KWF Baseline AWQMS Template") %>%
+  names() %>%
+  data.frame()
 
 # reorder columns using read in list from aqwms template
 
