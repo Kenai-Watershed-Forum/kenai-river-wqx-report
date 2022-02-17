@@ -1,4 +1,4 @@
-This is XeTeX, Version 3.141592653-2.6-0.999993 (TeX Live 2021/W32TeX) (preloaded format=xelatex 2021.12.14)  10 FEB 2022 12:50
+This is XeTeX, Version 3.141592653-2.6-0.999993 (TeX Live 2021/W32TeX) (preloaded format=xelatex 2021.12.14)  15 FEB 2022 10:13
 entering extended mode
  restricted \write18 enabled.
  %&-line parsing enabled.
@@ -954,44 +954,81 @@ Package natbib Warning: Citation `kenaiwatershedforum2020' on page 35 undefined
  on input line 251.
 
 [35]
-Overfull \hbox (90.75pt too wide) in paragraph at lines 293--293
+Overfull \hbox (90.75pt too wide) in paragraph at lines 295--295
 []\TU/lmtt/m/n/10 ## -- Attaching packages ------------------------------------
 --- tidyverse 1.3.1 --[] 
  []
 
 
-Overfull \hbox (90.75pt too wide) in paragraph at lines 306--306
+Overfull \hbox (90.75pt too wide) in paragraph at lines 308--308
 []\TU/lmtt/m/n/10 ## -- Conflicts ------------------------------------------ ti
 dyverse_conflicts() --[] 
  []
 
 [36]
+Overfull \hbox (27.75pt too wide) in paragraph at lines 399--399
+[]\TU/lmtt/m/n/10 ##     hour, isoweek, mday, minute, month, quarter, second, w
+day, week,[] 
+ []
+
 LaTeX Font Info:    Font shape `TU/lmtt/bx/n' in size <10> not available
-(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 384.
+(Font)              Font shape `TU/lmtt/b/n' tried instead on input line 417.
 
 LaTeX Font Warning: Font shape `TU/lmtt/bx/it' in size <10> not available
-(Font)              Font shape `TU/lmtt/b/sl' tried instead on input line 384.
+(Font)              Font shape `TU/lmtt/b/sl' tried instead on input line 417.
 
-[37] [38] [39] [40]
-Underfull \vbox (badness 10000) detected at line 604
+[37] [38]
+Underfull \vbox (badness 1776) detected at line 637
  []
 
 
-Underfull \vbox (badness 10000) detected at line 604
+Underfull \vbox (badness 1270) has occurred while \output is active []
+
+[39]
+Underfull \vbox (badness 10000) detected at line 637
+ []
+
+
+Underfull \vbox (badness 10000) detected at line 637
+ []
+
+[40]
+Underfull \vbox (badness 10000) detected at line 637
+ []
+
+
+Underfull \vbox (badness 10000) detected at line 637
  []
 
 [41] [42]
-Overfull \hbox (80.25pt too wide) in paragraph at lines 654--654
+Overfull \hbox (80.25pt too wide) in paragraph at lines 690--690
 []\TU/lmtt/m/n/10 ## Warning in read_fun(path = enc2native(normalizePath(path))
 , sheet_i = sheet, :[] 
  []
 
 
-Overfull \hbox (80.25pt too wide) in paragraph at lines 659--659
+Overfull \hbox (80.25pt too wide) in paragraph at lines 695--695
 []\TU/lmtt/m/n/10 ## Warning in read_fun(path = enc2native(normalizePath(path))
 , sheet_i = sheet, :[] 
  []
 
+[43] [44]
+Underfull \vbox (badness 10000) detected at line 875
+ []
+
+
+Underfull \vbox (badness 10000) detected at line 875
+ []
+
+[45]
+Underfull \vbox (badness 10000) detected at line 875
+ []
+
+
+Underfull \vbox (badness 10000) detected at line 875
+ []
+
+[46] [47]
 No file Kenai-River-Water-Quality-Assessment.bbl.
 
 Package natbib Warning: There were undefined citations.
@@ -999,7 +1036,7 @@ Package natbib Warning: There were undefined citations.
 
 Package longtable Warning: Table widths have changed. Rerun LaTeX.
 
-[43] [44] (./Kenai-River-Water-Quality-Assessment.aux)
+[48] (./Kenai-River-Water-Quality-Assessment.aux)
 
 LaTeX Warning: Label(s) may have changed. Rerun to get cross-references right.
 
@@ -1015,12 +1052,12 @@ t.out':
 (rerunfilecheck)             After:  0A3030F8438C53E3FA6754D79B926B85;2350.
  ) 
 Here is how much of TeX's memory you used:
- 17462 strings out of 478256
- 320861 string characters out of 5854376
- 783225 words of memory out of 5000000
- 37765 multiletter control sequences out of 15000+600000
+ 17464 strings out of 478256
+ 321049 string characters out of 5854376
+ 779225 words of memory out of 5000000
+ 37767 multiletter control sequences out of 15000+600000
  409913 words of font info for 84 fonts, out of 8000000 for 9000
  14 hyphenation exceptions out of 8191
- 86i,6n,121p,451b,411s stack positions out of 5000i,500n,10000p,200000b,80000s
+ 86i,6n,121p,451b,473s stack positions out of 5000i,500n,10000p,200000b,80000s
 
-Output written on Kenai-River-Water-Quality-Assessment.pdf (44 pages).
+Output written on Kenai-River-Water-Quality-Assessment.pdf (48 pages).

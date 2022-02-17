@@ -28,7 +28,7 @@ Water quality data generated from the Kenai River Baseline Water Quality Monitor
 
 #### 2021 Water Quality Data AQWMS Formatting
 
-The code scripts below assembles water quality data from the three analytic laboratories that partnered with Kenai Watershed Forum for this project in 2021:
+The code scripts below assembles water quality data from the three analytical laboratories that partnered with Kenai Watershed Forum for this project in 2021:
 
 -   SGS Laboratories (Anchorage, AK)
 
@@ -43,7 +43,11 @@ The code scripts below assembles water quality data from the three analytic labo
 
 ##### Metals/Nutrients Lab Results (SGS Labs)
 
-Download Original 2021 Metals/Nutrients Lab Results (Click Link)
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.pdf', text = "Download Original 2021 Metals/Nutrients Lab Results from SGS.pdf")
+
+```
+
 
 <details>
 
@@ -69,6 +73,8 @@ library(magrittr)
 library(janitor)
 library(hms)
 library(lubridate)
+
+xfun::pkg_load2(c("htmltools", "mime"))
 
 
 # Assign 2021 Field Sample Dates 
@@ -126,6 +132,36 @@ sgs21 <- bind_rows(spring_sgs21,summer_sgs21) %>%
 rm(spring_sgs21,summer_sgs21)
 
 
+
+# Original SGS engage downloads did not contain lab batch info (grey boxes in PDF doc). Acquired upon request in Feb 2022. 
+# We need to join batch info to overall results
+
+# read in
+spring_batch_sgs21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_sgs_batch_info.csv")
+summer_batch_sgs21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_sgs_batch_info.csv")
+
+# clean up and retain only useful columns
+batch_sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
+  clean_names() %>%
+  remove_empty() %>%
+  filter(str_detect(project_id,"Kenai")) %>%
+  select(sample_id,
+         collect_date,
+         lab_sample_id,
+         rec_date,
+         run_date_time,
+         extracted_date,
+         analyte,
+         analyst)
+
+
+```
+
+
+
+
+
+```{r}
 
 
 
@@ -292,7 +328,7 @@ sgs21 %<>%
   clean_names() 
 
 # remove dfs
-rm(sgs21_sitenames,aqwms21_sitenames,sitenames21_match)
+rm(sgs21_sitenames,aqwms21_sitenames)
 
 # remove old "client_sample"column
 sgs21 %<>% select(-client_sample)
@@ -357,9 +393,20 @@ sgs21 %<>%
 
 ***
 
-##### Fecal Coliform Lab Results (Soldotna Wastewater Treatment Plant/Taurianen Engineering)
+##### Fecal Coliform Lab Results (Soldotna Wastewater Treatment Plant (SWWTP)/Taurianen Engineering)
 
 Download Original 2021 Fecal Coliform Lab Results (Click Link)
+
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls', text = "Download Original Spring 2021 Fecal Lab Results from SWWTP")
+
+```
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/FecalColiform_Results_Summer2021.pdf', text = "Download Original Summer 2021 Fecal Coliform Lab Results from Taurianen")
+
+```
 
 <details>
 
@@ -441,7 +488,8 @@ swwtp_spring21 %<>%
          note = "",
          qualifier = "",
          epa_analysis_id = "9222D",
-         context_code = "APHA" ) %>%
+         context_code = "APHA",
+         analyst = "AW") %>%
   clean_names() %>%
   select(-ml,-colony_count) %>%
   # transform to prep for bind with sgs21
@@ -453,14 +501,16 @@ swwtp_spring21 %<>%
 ## join SGS 2021 data to Spring 2021 Fecal Coliform data from SWWTP
 dat <- bind_rows(sgs21,swwtp_spring21)
 
-
+rm(swwtp_spring21)
 
 
 
 
 
 ########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
-swwtp_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal_Coliform_Results_Spreadsheet.xlsx", skip = 3) %>%
+
+## read in taurianen summer 2021 results
+taur_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal_Coliform_Results_Spreadsheet.xlsx", skip = 3) %>%
   clean_names() %>%
   select(-qc1,-data_entry,-qc2) %>%
   
@@ -472,21 +522,82 @@ swwtp_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Tau
   # trim white spaces in site name column
   mutate(sample_location = str_trim(sample_location,"right")) %>%
   
-## add known info about times/dates
+## add known info about times/dates, correct formats and column names
   mutate(sample_date = mdy(summer21_sample_date),
          analysis_date_in = mdy(summer21_sample_date),
          analysis_time_in = as_hms(time_relinquished),
-         analysis_date_out = ,
-         analysis_time_out = )
-
-
-################ working here 2/14/22
-
-
+         analysis_date_out = mdy("8/28/2021"),
+         analysis_time_out = as_hms(time_tested), 
+         sample_date = mdy(summer21_sample_date),
+         # drop old columns
+         .keep = "unused") %>%
+  select(-date_of_testing) %>%
+  transform(time_sampled = as_hms(time_sampled)) %>%
+  
+## add lab name
+  mutate(lab_name = "Taurianen Engineering")
+  
 
 ## fix site naming and terminology
-z <- swwtp_summer21 %>%
+
+# generate spreadsheet of unique site names from taurianen dataset 
+taur_summer21_sites <- data.frame(unique(taur_summer21$sample_location)) %>%
+  rename(sample_location = unique.taur_summer21.sample_location.)
+
+# export site names list to spreadsheet
+write.xlsx(taur_summer21_sites, "other/input/AQWMS/taurianen_site_names_matching_table.xlsx")
+
+# manually edit a new spreadsheet such that taurianen site names are paired iwth AWQMS site names
+# read in manually edited site names sheet
+taur_summer21_sites <- read_excel("other/input/AQWMS/taurianen_site_names_matching_table_manual_edit.xlsx") 
+
+# join AWQMS site names to taurianen data
+# taur_summer21 <- left_join(taur_summer21,sitenames21_match,by = "sample_location") 
+
+# here, we are unsuccessful for the join by "sample_location" here for two sites (Poachers and Dow Island) foir unclear reasons. Attempted various fixes to allow left_join to proceed correctly but unsuccessful. 
+# temporary work around: export this current stage of dataframe, manually input sites, then re-import dataframe. 
+
+# export
+#write.xlsx(taur_summer21,"other/input/AQWMS/taur_summer21_temp.xlsx")
+
+# manually input missing site names
+
+# re-import
+taur_summer21 <- read.xlsx("other/input/AQWMS/taur_summer21_temp.xlsx")
+
+
+## add and/or rename other columns to match SWWTP dataframe structure
+taur_summer21 %<>%
+  clean_names() %>%
+  select(-direct_count,-neg_pos,-sample_location) %>%
+  rename(result = number_of_colonies) %>%
+
+  mutate(note = "",
+         matrix = "Water (Surface, Eff., Ground)",
+         analysis = "9222 D ~ Membrane filtration test for fecal coliforms",
+         analyte = "Fecal Coliform", 
+         unit = "cfu/100ml",
+         reporting_limit = 1,
+         mdl = "",
+         qualifier = "",
+         epa_analysis_id = "922D",
+         context_code = "APHA") %>%
+  transform(time_sampled = as_hms(time_sampled),
+            result = as.character(result),
+            analysis_time_in = as_hms(analysis_time_in),
+            analysis_time_out = as_hms(analysis_time_out),
+            analysis_date_in = excel_numeric_to_date(analysis_date_in),
+            analysis_date_out = excel_numeric_to_date(analysis_date_out),
+            sample_date = excel_numeric_to_date(sample_date),
+            mdl = as.double(mdl))
   
+
+# join 2021 Taurianen Fecal Coliform data into overall dataframe
+dat <- bind_rows(dat,taur_summer21)
+  
+
+rm(taur_summer21,taur_summer21_sites)
+
 ```
 
 </details>
@@ -499,7 +610,15 @@ z <- swwtp_summer21 %>%
 
 ##### Total Dissolved Solids Lab Results (Soldotna Wastewater Treatment Plant (SWWTP))
 
-Download Original 2021 Total Dissolved Solids Lab Results (Click Link)
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xls', text = "Download Original Spring 2021 Total Suspended Solids Results from SWWTP.xls")
+```
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xls', text = "Download Original Summer 2021 Total Suspended Solids Results from SWWTP.xls")
+```
+
 
 <details>
 
@@ -511,8 +630,14 @@ Download Original 2021 Total Dissolved Solids Lab Results (Click Link)
 
 
 ```{r}
-# SWWTP data
+# SWWTP Spring 2021 data
 ## Reformat TSS data to match AQWMS template
+swwtp_tss_spring21 <- read_excel('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xls', skip = 1) %>%
+  clean_names()
+
+swwtp_tss_summer21 <- read_excel('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xls', skip = 1) %>%
+  clean_names()
+
 
 ```
 
