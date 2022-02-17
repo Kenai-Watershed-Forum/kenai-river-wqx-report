@@ -152,16 +152,12 @@ batch_sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
          run_date_time,
          extracted_date,
          analyte,
-         analyst)
+         analyst) %>%
+  rename(client_sample = sample_id,
+         lab_sample = lab_sample_id) %>%
+  transform(lab_sample = as.character(lab_sample))
 
-
-```
-
-
-
-
-
-```{r}
+sgs21 <- left_join(batch_sgs21,sgs21, by = c("client_sample","analyte","lab_sample"))
 
 
 
@@ -204,6 +200,14 @@ als21 %<>%
          # assign matric type
          matrix = "Water (Surface, Eff., Ground)")
 
+
+# before proceeding here, we want to see if we can acquire other associated data regarding ALS samples
+
+```
+
+
+
+```{r}
 # join SGS data with ALS data
 sgs21 <- bind_rows(sgs21,als21) 
 
