@@ -73,6 +73,7 @@ library(magrittr)
 library(janitor)
 library(hms)
 library(lubridate)
+library(anytime)
 
 xfun::pkg_load2(c("htmltools", "mime"))
 
@@ -201,7 +202,7 @@ als21 %<>%
          matrix = "Water (Surface, Eff., Ground)")
 
 
-# before proceeding here, we want to see if we can acquire other associated data regarding ALS samples
+# before proceeding here, we want to see if we can acquire other associated 2021 data regarding ALS samples
 
 ```
 
@@ -381,6 +382,7 @@ rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 ######################## Part F: Assign lab analysis in/out dates ######################
 
 # TBD if necessary
+# yes
 
 
 ########################## Miscellaneous Steps #########################################
@@ -399,11 +401,9 @@ sgs21 %<>%
 
 ##### Fecal Coliform Lab Results (Soldotna Wastewater Treatment Plant (SWWTP)/Taurianen Engineering)
 
-Download Original 2021 Fecal Coliform Lab Results (Click Link)
-
 
 ```{r, echo = F}
-xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls', text = "Download Original Spring 2021 Fecal Lab Results from SWWTP")
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls', text = "Download Original Spring 2021 Fecal Coliform Lab Results from SWWTP")
 
 ```
 
@@ -616,11 +616,11 @@ rm(taur_summer21,taur_summer21_sites)
 
 
 ```{r, echo = F}
-xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xls', text = "Download Original Spring 2021 Total Suspended Solids Results from SWWTP.xls")
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xlsx', text = "Download Original Spring 2021 Total Suspended Solids Results from SWWTP.xlsx")
 ```
 
 ```{r, echo = F}
-xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xls', text = "Download Original Summer 2021 Total Suspended Solids Results from SWWTP.xls")
+xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xlsx', text = "Download Original Summer 2021 Total Suspended Solids Results from SWWTP.xlsx")
 ```
 
 
@@ -634,14 +634,99 @@ xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS 
 
 
 ```{r}
-# SWWTP Spring 2021 data
+# SWWTP Spring 2021 TSS data
 ## Reformat TSS data to match AQWMS template
-swwtp_tss_spring21 <- read_excel('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xls', skip = 1) %>%
+
+# read in
+swwtp_tss_spring21 <- read_excel('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xlsx', skip = 1, sheet = "Updated_Formatting") %>%
+  clean_names() %>%
+  transform(date_of_analysis = anydate(date_of_analysis)) %>%
+  # add info from lab COC
+  mutate(rec_date = "2021-05-11 14:00")
+
+swwtp_tss_summer21 <- read_excel('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xlsx', skip = 1, sheet = "Updated_Formatting") %>%
+  clean_names() %>%
+  transform(sample_time = anytime(sample_time)) %>%
+  # add info from lab COC
+  mutate(rec_date = "2021-07-27 14:00")
+
+
+# combine spring & summer
+swwtp_tss21 <- bind_rows(swwtp_tss_spring21,swwtp_tss_summer21) %>%
+  remove_empty() 
+rm(swwtp_tss_spring21,swwtp_tss_summer21)
+
+# prepare and format to match larger dataset
+swwtp_tss21 %<>%
+  # miscellaneous
+  select(-qc1,-data_entry,-x8) %>%
+  rename(analysis_time = time) %>%
+  transform(sample_time = as_hms(sample_time),
+            analysis_time = as_hms(analysis_time)) %>%
+
+  # move info about duplicate sample and/or sample blank status into separate column
+  mutate(sample_condition = case_when(
+    grepl("DUP",sample_location) ~ "DUP")) %>%
+  # remove "DUP" designation from locations column
+  mutate(sample_location = str_replace(sample_location, "_DUP", "")) %>%
+  # replace "O" with zeros in location column
+  mutate(sample_location = str_replace(sample_location, "RM_O", "RM_0")) %>%
+  # add units of suspended solids
+  mutate(unit = "mg/l") %>%
+  rename(result = s_s_mg_l) %>%
+  transform(result = as.character(result)) %>%
+  
+  # add info about EPA analysis type from AWQMS template
+  mutate(epa_analysis_id = "2540-D",
+         analysis = "",
+         context_code = "APHA",
+         qualifier = "",
+         note = "") %>%
+  
+  # remove tare and paper weight values
+  select(-dried_wt,-paper_wt,-tare_wt_kg, -ml) %>%
+  
+  # modify date/time formats
+  mutate(collect_date = as.character(paste(field_sample_date,sample_time)),
+         run_date_time = as.character(paste(date_of_analysis,analysis_time)), .keep = "unused",
+         # no extractions performed for TSS
+         extracted_date = "") %>%
+  mutate(sample_date = ymd(collect_date)) %>%
+  
+  # rename
+  rename(analyst = signature) %>%
+  
+  # miscellaneous
+  mutate(lab_sample = "",
+         matrix = "Water (Surface, Eff., Ground)",
+         analyte = "Total suspended solids",
+         reporting_limit = 1.0,
+         mdl = as.double(""),
+         lab_name = "Soldotna Wastewater Treatment Plant, Soldotna, Alaska")
+
+  
+  
+# get site names consistent with AWQMS format
+swwtp_tss_sitenames <- data.frame(unique(swwtp_tss21$sample_location))
+
+# delete existing csv if present
+unlink("other/input/AQWMS/swwtp_tss_sitenames.csv")
+
+# export csv of swwtp_tss site names
+write.csv(swwtp_tss_sitenames,"other/input/AQWMS/swwtp_tss_sitenames.csv",row.names = F)
+
+# use this list to create manually edited file, matched to AWQMS template names
+# read in manually edited file
+swwtp_tss_sitenames <- read_excel("other/input/AQWMS/swwtp_tss_site_names_matching_table_manual_edit.xlsx")
+
+# join correct site names to overall 2021 TSS dataset
+swwtp_tss21 <- left_join(swwtp_tss21,swwtp_tss_sitenames)  %>%
+  select(-sample_location) %>%
   clean_names()
 
-swwtp_tss_summer21 <- read_excel('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xls', skip = 1) %>%
-  clean_names()
 
+# join TSS data with overall dataset
+z <- bind_rows(dat,swwtp_tss21)
 
 ```
 
