@@ -827,7 +827,13 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
 ```{r, eval = F, echo = F}
 # check out example from other WQP download
 z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
-  filter(CharacteristicName == "Fecal Coliform")
+  #filter(CharacteristicName == "Fecal Coliform")
+  select(ActivityStartDate,CharacteristicName) %>%
+  clean_names() %>%
+  transform(activity_start_date = ymd(activity_start_date)) %>%
+  group_by(characteristic_name) %>%
+  summarise(min_date = min(activity_start_date),
+            max_date = max(activity_start_date))
 
 ### 1st step:::: make sure that monitoring list locations matches those currently match those in DEC AQWMS database (AWQMS public login: https://awqms2.goldsystems.com/Login.aspx, username akpublic, no password)
 
