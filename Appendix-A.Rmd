@@ -153,9 +153,16 @@ batch_sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
          run_date_time,
          extracted_date,
          analyte,
-         analyst) %>%
+         analyst, 
+         extraction_code,
+         dl,
+         amount_spiked,
+         percent_recovered,
+         allowable_limit,
+         sample_rpd) %>%
   rename(client_sample = sample_id,
-         lab_sample = lab_sample_id) %>%
+         lab_sample = lab_sample_id,
+         detection_limit = dl) %>%
   transform(lab_sample = as.character(lab_sample))
 
 sgs21 <- left_join(batch_sgs21,sgs21, by = c("client_sample","analyte","lab_sample"))
@@ -166,6 +173,47 @@ sgs21 <- left_join(batch_sgs21,sgs21, by = c("client_sample","analyte","lab_samp
 ###################### Part B: ALS Data Read In #############################
 
 ## SGS subcontracted analyses of Ca, Fe, and Mg to ALS laboratories (Kelso, WA). These results are not included in the spreadsheet download from SGS engage and were entered manually in to seperate spring and summer "ALS" named spreadsheets
+
+# 2/24/2022 - receiving EDD (electronic data deliverables) from ALS. Try it out with spring 2021
+
+#### read in spring 2021 results from ALS 
+spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv") %>%
+  
+  # when summer 2021 results are received, bind/join them here
+  
+  clean_names() %>%
+  remove_empty() %>%
+  
+  # proceed left to right of existing dataframe to make its naming structure match the sgs21 dataframe
+  rename(client_sample = sample,
+         collect_date = date_collected,
+         lab_sample = lab_code,
+         rec_date = date_received,
+         # sample_type ::: not sure where to match with sgs data yet or where to put in aqwms, but is important for qa/qc
+         extracted_date = date_extracted,
+         extraction_code = extraction_method,
+         
+        ##### SGS data has date and time, ALS has date only. will need to adjust later
+        
+         run_time_date = date_analyzed,
+         analysis = method,
+         analyte = component,
+
+        # note: in ALS data, result and result notes (U,J,etc) are already segregated, in SGS data they are not. remedy this.
+         qualifier = result_notes,
+         amount_spiked = spike_concentration,
+         percent_recovered = percent_recovery,
+         allowable_limit = acceptance_limits,
+         sample_rpd = rpd) %>%
+  mutate(matrix = "Water (Surface, Eff., Ground)") 
+
+
+
+
+
+
+
+############## remove below if EDD makes manually entered files unnecessary ##########################
 
 #### read in spring 2021 results from ALS 
 spring_als21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Total Metals from ALS Lab.xlsx", skip = 5) %>%
@@ -200,6 +248,8 @@ als21 %<>%
   mutate(lab_name = "ALS Environmental - Kelso Laboratory",
          # assign matric type
          matrix = "Water (Surface, Eff., Ground)")
+
+############## remove above if EDD makes manually entered files unnecessary ##########################
 
 
 # before proceeding here, we want to see if we can acquire other associated 2021 data regarding ALS samples
@@ -731,6 +781,12 @@ z <- bind_rows(dat,swwtp_tss21)
 ```
 
 </details>
+
+
+Notes:
+- we have lab duplicates from ALS and others... need to retain for internal qa/qc but not submit to aqwms
+
+2/24/22 -- all we are missing for 2021 is the EDD file for summer ALS data. Integrate in pipeline when available. Good to proceed with final formatting!
 
 
 
