@@ -44,10 +44,14 @@ The code scripts below assembles water quality data from the three analytical la
 ##### Metals/Nutrients Lab Results (SGS Labs)
 
 ```{r, echo = F}
-xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.pdf', text = "Download Original 2021 Metals/Nutrients Lab Results from SGS.pdf")
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_sgs_batch_info.csv', text = "Download Original Spring 2021 Metals/Nutrients Lab Results from SGS")
 
 ```
 
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_sgs_batch_info.csv', text = "Download Original Summer 2021 Metals/Nutrients Lab Results from SGS")
+
+```
 
 <details>
 
@@ -85,7 +89,11 @@ spring21_sample_date <- "5/11/2021"
 
 # Summer 2021 Sampling Date
 summer21_sample_date <-"8/27/2021"
+```
 
+
+
+```{r, echo = F}
 ################################################################################################################
 ######################################### Read in  and Clean SGS/ALS Data ######################################
 ################################################################################################################
@@ -93,94 +101,47 @@ summer21_sample_date <-"8/27/2021"
 
 ############################ Part A: SGS Data Read In #############################
 
-## Reformat SGS data downloaded from their server client (SGS Engage) to match AQWMS template
-
-### spring 2021 SGS data
-
-#### read in results downloaded from SGS 
-spring_sgs21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/Spring 2021 Results from SGS.xlsx", sheet = "Report", skip = 4) %>%
-  mutate(`Lab Sample` = as.double(`Lab Sample`)) %>%
-  # assign field sample date
- # mutate(sample_date = spring21_sample_date) %>%
-  clean_names()
-
-### summer 2021 SGS data
-
-#### read in results downloaded from SGS 
-summer_sgs21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/SGS_results_Summer2021.xlsx", sheet = "Report", skip = 4) %>%
-  # filter out extraneous info
-  filter(!`Client Sample` %in%c("Sample Comments","Client Sample Id"),
-         !`Matrix` %in% "200.7 Total Ca, Fe, Mg were analyzed by ALS of Kelso, WA.",
-         !is.na(`Lab Sample`)) %>%
-  # remove blank columns
-  select(-starts_with("...")) %>%
-  # assign field sample date
- # mutate(sample_date = summer21_sample_date) %>%
-  clean_names()
-
-# transform column types to prep for join
-summer_sgs21 %<>%
-  mutate(lab_sample = as.double(lab_sample),
-         reporting_limit = as.double(reporting_limit))
-
-# append spring and summer 2021 results
-sgs21 <- bind_rows(spring_sgs21,summer_sgs21) %>%
-  # make lab sample column character
-  transform(lab_sample = as.character(lab_sample))
-
-rm(spring_sgs21,summer_sgs21)
-
-
-
-# Original SGS engage downloads did not contain lab batch info (grey boxes in PDF doc). Acquired upon request in Feb 2022 upon discovery that they existed. 
-# We need to join batch info to overall results
-# for future years data prep, just use full batch (or "EDD", Electronic Data Delivery) files directly instead of the summary downloads
+## Reformat SGS data downloaded from their server client (SGS Engage, full EDD files) to match AQWMS template
 
 # read in
 spring_batch_sgs21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_sgs_batch_info.csv")
 summer_batch_sgs21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_sgs_batch_info.csv")
 
 # clean up and retain only useful columns
-batch_sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
+sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
   clean_names() %>%
   remove_empty() %>%
+  # retain only field sample results
   filter(str_detect(project_id,"Kenai")) %>%
-  select(sample_id,
-         collect_date,
-         lab_sample_id,
-         rec_date,
-         run_date_time,
-         extracted_date,
-         analyte,
-         analyst, 
-         extraction_code,
-         dl,
-         amount_spiked,
-         percent_recovered,
-         allowable_limit,
-         sample_rpd) %>%
-  rename(client_sample = sample_id,
+  # remove unneeded columns
+  select(-project_id)%>%
+  rename(sample = sample_id,
          lab_sample = lab_sample_id,
          detection_limit = dl) %>%
   transform(lab_sample = as.character(lab_sample),
             sample_rpd = as.character(sample_rpd)) %>%
   # add lab name
-  mutate(lab_name = "SGS North America, Anchorage, Alaska") 
-
-sgs21 <- left_join(batch_sgs21,sgs21, by = c("client_sample","analyte","lab_sample"))
-```
-
-
-```{r}
-# split a.) lab sample run & b.) collect time and date in prep for future join
-sgs21 %<>%
-  transform(run_date_time = mdy_hm(run_date_time),
-            collect_date = mdy_hm(collect_date)) %>%
-  mutate(run_date = date(run_date_time),
+  mutate(lab_name = "SGS North America, Anchorage, Alaska",
+         matrix = "Water") %>%
+  
+  # split a.) lab sample run & b.) collect time and date in prep for future join with ALS data
+          ##### NOTE: SGS data has date and time, ALS has date only. 
+  transform(collect_date_time = mdy_hm(collect_date),
+            rec_date_time = mdy_hm(rec_date),
+            run_date_time = mdy_hm(run_date_time),
+            extracted_date_time = mdy_hm(extracted_date)) %>%
+  mutate(collect_time = as_hms(collect_date_time),
+         collect_date = date(collect_date_time),
+         rec_date = date(rec_date_time),
+         rec_time = as_hms(rec_date_time),
          run_time = as_hms(run_date_time),
-         collect_time = as_hms(collect_date),
-         collect_date = date(collect_date)) %>%
-  transform(run_time = as.character(run_time))
+         run_date = date(run_date_time),
+         extacted_time = as_hms(extracted_date_time),
+         extracted_date = date(extracted_date_time)) %>%
+  select(-collect_date_time,-rec_date_time,-run_date_time) %>%
+  rename(sample = sample)
+
+rm(spring_batch_sgs21,summer_batch_sgs21)
 
 
 
@@ -207,123 +168,120 @@ als21 <- spring_als21 %>%
   clean_names() %>%
   remove_empty() %>%
   
-  # proceed left to right of existing dataframe to make its naming structure match the sgs21 dataframe
-  rename(client_sample = sample,
-         collect_date = date_collected,
-         lab_sample = lab_code,
+  # proceed left to right of existing ALS dataframe to make its naming structure match the sgs21 dataframe. Add, remove, modify column names as needed
+  select(-client,
+         -project,
+         -service_request) %>%
+  rename(lab_sample = lab_code) %>%
+  rename(collect_date = date_collected,
          rec_date = date_received,
          # sample_type ::: not sure where to match with sgs data yet or where to put in aqwms, but is important for qa/qc
          extracted_date = date_extracted,
          extraction_code = extraction_method,
-         
-        ##### SGS data has date and time, ALS has date only. will need to adjust later
-        
          run_date = date_analyzed,
-         analysis = method,
-         unit = units,
+         analytical_method = method,
+         #units = units,
          analyte = component,
 
-        # note: in ALS data, result and result notes (U,J,etc) are already segregated, in SGS data they are not. remedy this.
-         qualifier = result_notes,
+         resultflag = result_notes,
          amount_spiked = spike_concentration,
          percent_recovered = percent_recovery,
          allowable_limit = acceptance_limits,
-         sample_rpd = rpd) %>%
-  mutate(matrix = "Water (Surface, Eff., Ground)",
-         lab_name = "ALS Environmental, Kelso, WA",
-         run_time = "") %>%
-  transform(analysis = as.character(analysis),
+         sample_rpd = rpd,
+        # change report/detection limit terminology  See SGS document, "SGS DL, LOD, LOQ Interpretation"
+         loq = reporting_limit) %>%
+  
+  mutate(lab_name = "ALS Environmental, Kelso, Washington"
+         #,
+         #run_time = ""
+         ) %>%
+  # prep column classes to bind with sgs dataframe
+  transform(analytical_method = as.character(analytical_method),
             run_date = mdy(run_date),
-            collect_date = mdy(collect_date))
+            #run_time = as_hms(run_time),
+            collect_date = mdy(collect_date),
+            rec_date = mdy(rec_date),
+            extracted_date = mdy(extracted_date),
+            result = as.double(result))
 
-
-```
-
-
-
-```{r}
-
-# run time/date in sgs vs run date only in als
 
 # join SGS data with ALS data
-sgs21 <- bind_rows(sgs21,als21)  %>%
-  # miscellaneous
-  select(-run_date_time)
+dat <- bind_rows(sgs21,als21)  
 
-rm(als21)
+rm(als21,sgs21,spring_als21)
 
 
 
 ############### Part C: Address spelling/format issues and inconsistent sample/site names ######################
 
-# upon visual inspection of site names, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
+# Upon visual inspection of site names, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
 
   
 # move info about duplicate sample and/or sample blank status into separate column
-sgs21 %<>%
+dat %<>%
   mutate(sample_condition = case_when(
-    grepl("Blank",client_sample) ~ "Blank",
-    grepl("DUP",client_sample) ~ "DUP",
-    grepl("Dup",client_sample) ~ "DUP")) %>%
-  # remove "DUP" designation from client_sample column
-  mutate(client_sample = str_replace(client_sample, "DUP|Dup", "")) 
+    grepl("Blank",sample) ~ "Blank",
+    grepl("DUP",sample) ~ "DUP",
+    grepl("Dup",sample) ~ "DUP")) %>%
+  # remove "DUP" designation from sample column
+  mutate(sample = str_replace(sample, "DUP|Dup", "")) 
 
   
-# remove from "client_sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
-sgs21 %<>%  
-  mutate(client_sample = (str_replace(client_sample, "Diss|Dis|DUP|Dup", ""))) %>%
+# remove from "sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
+dat %<>%  
+  mutate(sample = (str_replace(sample, "Diss|Dis|DUP|Dup",""))) %>%
   
-  # remove "Diss" suffix and "EP" prefix from "analysis" column
-  mutate(analysis = str_replace(analysis, "Diss", "")) %>%
+  # remove "Diss" suffix and "EP" prefix from "analytical_method" column
+  mutate(analytical_method = str_replace(analytical_method, "Diss", "")) %>%
   # note trailing space after "EP200.8 "
-  mutate(analysis = str_replace(analysis,"EP200.8 ","200.8")) %>%
+  mutate(analytical_method = str_replace(analytical_method,"EP200.8 ","200.8")) %>%
 
   # address the one stubborn site name still containing "Diss"
-  mutate(client_sample = case_when(
-    client_sample == "RM0-No Name Creek  Diss" ~ "RM0-No Name Creek",
-    TRUE ~ client_sample)) 
+  mutate(sample = case_when(
+    sample == "RM0-No Name Creek  Diss" ~ "RM0-No Name Creek",
+    TRUE ~ sample)) 
   
   
-# We need to remove white spaces, apostrophes, and dashes; because join functions such as "left_join" are often uncooperative with these types of strings. We will need to use joins with site names in next steps.
+# We need to remove white spaces, apostrophes, and dashes; because join functions such as "left_join" are often uncooperative with these types of string characters. We will need to use joins with site names in next steps.
   
-sgs21 %<>%
+dat %<>%
     # remove excess white spaces
-  mutate(client_sample = str_trim(client_sample,"both")) %>%
-  mutate(client_sample = str_squish(client_sample)) %>%
+  mutate(sample = str_trim(sample,"both")) %>%
+  mutate(sample = str_squish(sample)) %>%
   
   # make remaining white spaces underscores
-  mutate(client_sample = gsub("\\s+","_",client_sample)) %>%
+  mutate(sample = gsub("\\s+","_",sample)) %>%
   
   # remove apostrophes
-  mutate(client_sample = gsub("\\'","",client_sample)) %>%
+  mutate(sample = gsub("\\'","",sample)) %>%
   
   # replace dashes with underscores
-  mutate(client_sample = gsub("\\-","_",client_sample)) %>%
+  mutate(sample = gsub("\\-","_",sample)) %>%
   
   # replace multiple underscores with single
-  mutate(client_sample = gsub("\\__","_",client_sample)) %>%
-  mutate(client_sample = gsub("\\___","_",client_sample)) %>%
+  mutate(sample = gsub("\\__","_",sample)) %>%
+  mutate(sample = gsub("\\___","_",sample)) %>%
 
   # again replace multiple underscores with single
-  mutate(client_sample = gsub("\\__","_",client_sample)) 
+  mutate(sample = gsub("\\__","_",sample)) 
 
 # apply note regarding trip blanks (for BTEX organics)
 # assigned in sequence as encountered on chain of custody
-sgs21 %<>%
+dat %<>%
   mutate(note = case_when(
-    grepl("Trip_Blank_1", client_sample) ~ "KWF Crew, RM1.5_Kenai_City_Dock",
-    grepl("Trip_Blank_2", client_sample) ~ "USFWS Crew, RM6.5_Cunningham_Park",
-    grepl("Trip_Blank_3", client_sample) ~ "DEC Crew, RM40_Bings_Landing",
-    grepl("Trip_Blank_4", client_sample) ~ "DEC Crew, RM43_Upstream_of_Dow_Island"))
+    grepl("Trip_Blank_1", sample) ~ "KWF Crew, RM1.5_Kenai_City_Dock",
+    grepl("Trip_Blank_2", sample) ~ "USFWS Crew, RM6.5_Cunningham_Park",
+    grepl("Trip_Blank_3", sample) ~ "DEC Crew, RM40_Bings_Landing",
+    grepl("Trip_Blank_4", sample) ~ "DEC Crew, RM43_Upstream_of_Dow_Island"))
   
   
 # seperate result qualifiers (U, J, B) in to a new column
-sgs21 %<>%
+#sgs21 %<>%
   # account for fact that als data already has qualifier column and has characters in results column
-  mutate(qualifier = case_when(
-    result == "ND" ~ qualifier,
-    result != "ND" ~ str_extract(result,"[aA-zZ]+"))) %>%
-  mutate(result = str_remove(result,"[aA-zZ]+")) 
+ # mutate(qualifier = case_when(
+  #  result == "ND" ~ qualifier,
+  #  result != "ND" ~ str_extract(result,"[aA-zZ]+"))) %>%
+#  mutate(result = str_remove(result,"[aA-zZ]+")) 
 
 
 
@@ -334,7 +292,7 @@ sgs21 %<>%
 # In preparation for a join to AQWMS table, we will manually generate a match table csv file that we can use 
 
 ## generate list of unique site names from 2021 SGS data
-sgs21_sitenames <- data.table(unique(sgs21$client_sample)) 
+sgs21_sitenames <- data.table(unique(dat$sample)) 
   
 
 # generate list of unique site names from 2021 AQWMS template. these are the names we want in the final product
@@ -355,26 +313,23 @@ saveWorkbook(wb,site_match_table_path,overwrite = TRUE)
 
 # Using these two tables, we will manually create a new file titled "sgs_site_names_matching_table_manual_edit.xlsx" and manually match up the two disparate naming systems. 
 
-# Performed by B Meyer February 2022.
-
+# Performed manually by B Meyer February 2022.
 
 # append "Monitoring Location Name" and "Monitoring Location ID" info from WQX to spring 2021 SGS data
 
 ## read in site names join table
 sitenames21_match <- read_excel("other/input/AQWMS/sgs_site_names_matching_table_manual_edit.xlsx") %>%
   select(`Monitoring Location Name`,`Monitoring Location ID`,sgs_sitenames) %>%
-  rename(client_sample = sgs_sitenames)
+  rename(sample = sgs_sitenames) %>%
+  filter(!is.na(`Monitoring Location ID`))
 
 # append monitoring location names
-sgs21 %<>%
-  left_join(sitenames21_match, by = "client_sample") %>%
-  clean_names() 
+dat %<>%
+  left_join(sitenames21_match, by = "sample") %>%
+  clean_names()
 
 # remove dfs
-rm(sgs21_sitenames,aqwms21_sitenames)
-
-# remove old "client_sample"column
-sgs21 %<>% select(-client_sample)
+rm(sgs21_sitenames,aqwms21_sitenames,sitenames21_match)
 
 
 
@@ -388,9 +343,9 @@ sgs21 %<>% select(-client_sample)
 analysis_code_matching_table <- read_excel("other/input/AQWMS/analysis_code_matching_table.xlsx") %>%
   select(-Comments,-`EPA Name`) %>%
   clean_names() %>%
-  rename(analysis = sgs_analysis_code) %>%
+  rename(analytical_method = sgs_analysis_code) %>%
   # remove "EP" prefix from method "EP200.8"
-  mutate(analysis = str_replace(analysis,"EP200.8","200.8"))
+  mutate(analytical_method = str_replace(analytical_method,"EP200.8","200.8"))
   
 
 # read in AQWMS Analytical Methods list
@@ -406,48 +361,62 @@ epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching
                               "APHA (1999)")) 
 
 # join EPA analysis IDs and context codes to overall dataset
-sgs21 %<>%
-  left_join(epa_analysis_codes, by = "analysis")
+dat %<>%
+  left_join(epa_analysis_codes, by = "analytical_method")
+  # remove extraneous column
 
 # remove unneeded dfs
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 
+```
+
+
+```{r}
 
 ########################## Miscellaneous Steps #########################################
+
+
+# move "DUP1" in sample_type column over to sample_condition as "DUP"
+dat %<>%
+  mutate(sample_condition = case_when(
+    sample_type == "DUP1" ~ "DUP",
+    sample_type != "DUP1" ~ sample_condition))
 
 
 # issue: the ALS Electronic Data Deliverables do not include sample collection time, only date. But - we have the sample collection times populated for all the SGS data. The collection time is identical for both since they're from the same sample.
 
 # solve this issue by creating a matching table a.) creating csv of all iterations of location; b.) populate this spreadsheet with manually entered times from ALS pdf, c.) import and left_join this df back to the main dataframe, then c.) delete the old collect_time column
-```
 
 
-WORKING HERE 2/25/22 TO RECITIFY COLLECT TIME ISSUE DESCRIBED
+
+# WORKING HERE 2/25/22 TO RECITIFY COLLECT TIME ISSUE DESCRIBED... WAIT TO SEE IF ALS CAN PROVIDE DATA IN EDD BEFORE PURSUING !!! Might not be essential info
 
 
-```{r}
+#z <- dat %>%
+ # filter(analytical_method == "EP200.8") %>%
+#  select(monitoring_location_id,collect_date,collect_time,analytical_method,sample_condition) %>%
+#  distinct()
+
+#z1 <- dat %>%
+#  select(-collect_time)
+
 # a.) create a matching table for all iterations of collect_date, collect_time, and location
-match_df_collect_time <- sgs21 %>%
-  filter(analyte == "Total Phosphorus") %>%
-  distinct(monitoring_location_name,sample_condition, collect_date, collect_time) 
-  mutate(collect_time = "") %>%
-  filter(!is.na(monitoring_location_name))
+#match_df_collect_time <- sgs21 %>%
+#  filter(analyte == "Total Phosphorus") %>%
+#  distinct(monitoring_location_name,sample_condition, collect_date, collect_time) 
+#  mutate(collect_time = "") %>%
+#  filter(!is.na(monitoring_location_name))
 
 # write.csv(match_df_collect_time,"other/input/AQWMS/match_df_collect_time_spring_als21.csv", row.names = F)
 
 
 # b.) left_join this df back to the main dataframe
-z <- left_join(sgs21,match_df_collect_time, by = c("collect_date","monitoring_location_id"))
+#z <- left_join(sgs21,match_df_collect_time, by = c("collect_date","monitoring_location_id"))
 
 
 # remove matching table
-rm(match_df_collect_time)
+#rm(match_df_collect_time)
 
-# rectify select column classes
-
-sgs21 %<>%
- # transform(sample_date = mdy(sample_date)) %>%
-  select(-run_date_time)
 ```
 
 </details>
@@ -536,18 +505,24 @@ swwtp_spring21 %<>%
 ## rename existing column names and create new ones to match sgs21 data format at end of prior code chunk
 swwtp_spring21 %<>% 
   rename(lab_sample = dish_number,
-         result = colony_count_100m_l) %>%
+         result = colony_count_100m_l,
+         collect_time = time_sampled,
+         run_time = analysis_time_in,
+         run_date = analysis_date_in,
+         # = analysis_time_out,
+         # = analysis_date_out,
+         collect_date = sample_date,
+         units = unit) %>%
   mutate(note = paste0("Lab analysis volume = ",ml," mL"),
          matrix = "Water (Surface, Eff., Ground)",
-         analysis = "9222 D ~ Membrane filtration test for fecal coliforms",
+         analytical_method = "9222 D ~ Membrane filtration test for fecal coliforms",
          analyte = "Fecal Coliform",
          unit = "cfu/100ml",
          # reporting limit value from 2019 QAPP, pg 17
          reporting_limit = 1.0,
          lab_name = "Soldotna Wastewater Treatment Plant",
-         mdl = "",
-         note = "",
-         qualifier = "",
+
+         
          epa_analysis_id = "9222D",
          context_code = "APHA",
          analyst = "AW") %>%
@@ -555,12 +530,20 @@ swwtp_spring21 %<>%
   select(-ml,-colony_count) %>%
   # transform to prep for bind with sgs21
   transform(lab_sample = as.character(lab_sample),
-            mdl = as.double(mdl))
+            result = as.double(result)) 
+ 
+
+```
 
 
+# workimg here 2/28/22 to recifty columns b/t FC and metals
 
+```{r}
 ## join SGS 2021 data to Spring 2021 Fecal Coliform data from SWWTP
-dat <- bind_rows(sgs21,swwtp_spring21)
+#dat 
+
+z<- bind_rows(dat,swwtp_spring21) %>%
+  select(-location)
 
 rm(swwtp_spring21)
 
