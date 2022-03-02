@@ -136,7 +136,7 @@ sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
          rec_time = as_hms(rec_date_time),
          run_time = as_hms(run_date_time),
          run_date = date(run_date_time),
-         extacted_time = as_hms(extracted_date_time),
+         extracted_time = as_hms(extracted_date_time),
          extracted_date = date(extracted_date_time)) %>%
   select(-collect_date_time,-rec_date_time,-run_date_time) %>%
   rename(sample = sample)
@@ -511,18 +511,16 @@ swwtp_spring21 %<>%
          run_date = analysis_date_in,
          # = analysis_time_out,
          # = analysis_date_out,
-         collect_date = sample_date,
-         units = unit) %>%
+         collect_date = sample_date) %>%
   mutate(note = paste0("Lab analysis volume = ",ml," mL"),
          matrix = "Water (Surface, Eff., Ground)",
          analytical_method = "9222 D ~ Membrane filtration test for fecal coliforms",
          analyte = "Fecal Coliform",
-         unit = "cfu/100ml",
-         # reporting limit value from 2019 QAPP, pg 17
-         reporting_limit = 1.0,
+         units = "cfu/100ml",
+         # reporting limit ("loq") value from 2019 QAPP, pg 17
+         loq = 1.0,
          lab_name = "Soldotna Wastewater Treatment Plant",
-
-         
+         units = "cfu/100ml",
          epa_analysis_id = "9222D",
          context_code = "APHA",
          analyst = "AW") %>%
@@ -532,21 +530,12 @@ swwtp_spring21 %<>%
   transform(lab_sample = as.character(lab_sample),
             result = as.double(result)) 
  
-
-```
-
-
-# workimg here 2/28/22 to recifty columns b/t FC and metals
-
-```{r}
 ## join SGS 2021 data to Spring 2021 Fecal Coliform data from SWWTP
-#dat 
 
-z<- bind_rows(dat,swwtp_spring21) %>%
+dat <- bind_rows(dat,swwtp_spring21) %>%
   select(-location)
 
 rm(swwtp_spring21)
-
 
 
 
@@ -568,26 +557,29 @@ taur_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taur
   mutate(sample_location = str_trim(sample_location,"right")) %>%
   
 ## add known info about times/dates, correct formats and column names
-  mutate(sample_date = mdy(summer21_sample_date),
-         analysis_date_in = mdy(summer21_sample_date),
-         analysis_time_in = as_hms(time_relinquished),
+  mutate(collect_date = mdy(summer21_sample_date),
+         run_date = mdy(summer21_sample_date),
+         run_time = as_hms(time_relinquished),
          analysis_date_out = mdy("8/28/2021"),
          analysis_time_out = as_hms(time_tested), 
-         sample_date = mdy(summer21_sample_date),
          # drop old columns
          .keep = "unused") %>%
-  select(-date_of_testing) %>%
+  select(-date_of_testing,-neg_pos) %>%
   transform(time_sampled = as_hms(time_sampled)) %>%
   
 ## add lab name
-  mutate(lab_name = "Taurianen Engineering, Soldotna, AK")
+  mutate(lab_name = "Taurianen Engineering and Testing, Soldotna, Alaska") %>%
+  
+  # 
+  rename(sample = sample_location,
+         collect_time = time_sampled)
   
 
 ## fix site naming and terminology
 
 # generate spreadsheet of unique site names from taurianen dataset 
-taur_summer21_sites <- data.frame(unique(taur_summer21$sample_location)) %>%
-  rename(sample_location = unique.taur_summer21.sample_location.)
+taur_summer21_sites <- data.frame(unique(taur_summer21$sample)) %>%
+  rename(sample = unique.taur_summer21.sample.)
 
 # export site names list to spreadsheet
 write.xlsx(taur_summer21_sites, "other/input/AQWMS/taurianen_site_names_matching_table.xlsx")
@@ -597,43 +589,26 @@ write.xlsx(taur_summer21_sites, "other/input/AQWMS/taurianen_site_names_matching
 taur_summer21_sites <- read_excel("other/input/AQWMS/taurianen_site_names_matching_table_manual_edit.xlsx") 
 
 # join AWQMS site names to taurianen data
-taur_summer21 <- left_join(taur_summer21,taur_summer21_sites,by = "sample_location") 
+taur_summer21 <- left_join(taur_summer21,taur_summer21_sites,by = "sample") 
 
-
-
-# here, we are unsuccessful for the join by "sample_location" here for two sites (Poachers and Dow Island) for unclear reasons. Attempted various fixes to allow left_join to proceed correctly but unsuccessful. 
-# temporary work around: export this current stage of dataframe, manually input sites, then re-import dataframe. 
-
-# export
-#write.xlsx(taur_summer21,"other/input/AQWMS/taur_summer21_temp.xlsx")
-
-# manually input missing site names
-
-# re-import
-#taur_summer21 <- read.xlsx("other/input/AQWMS/taur_summer21_temp.xlsx")
 
 
 ## add and/or rename other columns to match SWWTP dataframe structure
 taur_summer21 %<>%
   clean_names() %>%
-  select(-direct_count,-neg_pos,-sample_location) %>%
+  select(-direct_count) %>%
   rename(result = number_of_colonies) %>%
   mutate(note = "",
-         matrix = "Water (Surface, Eff., Ground)",
-         analysis = "9222 D ~ Membrane filtration test for fecal coliforms",
+         matrix = "Water",
+         analytical_method = "9222 D ~ Membrane filtration test for fecal coliforms",
          analyte = "Fecal Coliform", 
-         unit = "cfu/100ml",
-         reporting_limit = 1,
-         mdl = "",
-         qualifier = "",
+         units = "cfu/100ml",
+         # loq = reporting limit
+         loq = 1,
          epa_analysis_id = "922D",
          context_code = "APHA") %>%
-  transform(result = as.character(result),
-            mdl = as.double(mdl))
-```
+  transform(result = as.double(result))
 
-
-```{r}
 
 # join 2021 Taurianen Fecal Coliform data into overall dataframe so far
 dat <- bind_rows(dat,taur_summer21)
@@ -684,13 +659,13 @@ swwtp_tss_spring21 <- read_excel('other/input/2021_wqx_data/spring_2021_wqx_data
   clean_names() %>%
   transform(date_of_analysis = anydate(date_of_analysis)) %>%
   # add info from lab COC
-  mutate(rec_date = "2021-05-11 14:00")
+  mutate(rec_date = ymd_hms("2021-05-11 14:00:00"))
 
 swwtp_tss_summer21 <- read_excel('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xlsx', skip = 1, sheet = "Updated_Formatting") %>%
   clean_names() %>%
   transform(sample_time = anytime(sample_time)) %>%
   # add info from lab COC
-  mutate(rec_date = "2021-07-27 14:00")
+  mutate(rec_date = ymd_hms("2021-07-27 14:00:00"))
 
 
 # combine spring & summer
@@ -714,15 +689,14 @@ swwtp_tss21 %<>%
   # replace "O" with zeros in location column
   mutate(sample_location = str_replace(sample_location, "RM_O", "RM_0")) %>%
   # add units of suspended solids
-  mutate(unit = "mg/l") %>%
+  mutate(units = "mg/l") %>%
   rename(result = s_s_mg_l) %>%
-  transform(result = as.character(result)) %>%
+  transform(result = as.numeric(result)) %>%
   
   # add info about EPA analysis type from AWQMS template
   mutate(epa_analysis_id = "2540-D",
-         analysis = "",
+         analytical_method = "SM21-2540-+D",
          context_code = "APHA",
-         qualifier = "",
          note = "") %>%
   
   # remove tare and paper weight values
@@ -730,20 +704,20 @@ swwtp_tss21 %<>%
   
   # modify date/time formats
   mutate(collect_date = as.character(paste(field_sample_date,sample_time)),
-         run_date_time = as.character(paste(date_of_analysis,analysis_time)), .keep = "unused",
-         # no extractions performed for TSS
-         extracted_date = "") %>%
-  mutate(sample_date = ymd(collect_date)) %>%
+         run_date_time = as.character(paste(date_of_analysis,analysis_time)), .keep = "unused") %>%
+  mutate(collect_date = ymd(collect_date),
+         run_time = as_hms(ymd_hms(run_date_time)),
+         run_date = date(ymd_hms(run_date_time)),.keep = "unused") %>%
   
   # rename
   rename(analyst = signature) %>%
   
   # miscellaneous
   mutate(lab_sample = "",
-         matrix = "Water (Surface, Eff., Ground)",
+         matrix = "Water",
          analyte = "Total suspended solids",
-         reporting_limit = 1.0,
-         mdl = as.double(""),
+         # loq = reporting limit
+         loq = 1.0,
          lab_name = "Soldotna Wastewater Treatment Plant, Soldotna, Alaska")
 
   
@@ -763,8 +737,8 @@ swwtp_tss_sitenames <- read_excel("other/input/AQWMS/swwtp_tss_site_names_matchi
 
 # join correct site names to overall 2021 TSS dataset
 swwtp_tss21 <- left_join(swwtp_tss21,swwtp_tss_sitenames)  %>%
-  select(-sample_location) %>%
-  clean_names()
+  clean_names() %>%
+  rename(sample = sample_location)
 
 
 # join TSS data with overall dataset
@@ -775,12 +749,22 @@ dat <- bind_rows(dat,swwtp_tss21)
 </details>
 
 
+```{r, echo = F}
+# filter out lab blanks and positive lab controls
+dat %<>%
+  filter(!sample_condition %in% c("Lab Blank","Positive Control"))
+
+```
+
+
 Notes:
-- we have lab duplicates from ALS and others... need to retain for internal qa/qc but not submit to aqwms
+- we have LAB duplicates from ALS and others... need to retain for internal qa/qc but not submit to aqwms
 
-2/24/22 -- all we are missing for 2021 is the EDD file for summer ALS data. Integrate in pipeline when available. Good to proceed with final formatting!
+3/1/22 -- all we are missing for 2021 is the EDD file for summer ALS data. Integrate in pipeline when available. Good to proceed with final formatting!
 
+Need to figure out how to segregate and designate BTEX Trip Blanks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! (see 'activity type')
 
+working here to un-hashtag one by one
 
 
 ```{r, eval = F, echo = F}
@@ -789,7 +773,7 @@ Notes:
 
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
-z <- sgs21 %>%
+z <- dat %>%
   # Proceeding left to right across columns of AWQMS template
   # Mutate new column or rename existing column as needed
   
@@ -799,11 +783,10 @@ z <- sgs21 %>%
     `Activity Media Subdivision Name` = "Surface Water",
     # create activity ID name conditionally if condition(s) present
     `Activity ID` = case_when(
-      is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte),
-      !is.na(sample_condition) ~ paste0(monitoring_location_id,"-",sample_date,"-",analyte,"-",sample_condition)),
-    `Activity ID` = ifelse(is.na(sample_condition),`Activity ID`, paste0(`Activity ID`,"-",sample_condition)),
-    #`Activity Start Date` = "*",
-    #`Activity Start Time` = "*",
+      is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte),
+      !is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte,"-",sample_condition)),
+    `Activity Start Date` = collect_date,
+    `Activity Start Time` = collect_time,
     #`Activity End Date` = "*",
     #`Activity End Time` = "*",
     #`Activity Latitude` = "*",
@@ -820,18 +803,21 @@ z <- sgs21 %>%
     `Activity Bottom Depth/Height Measure` = "",
     `Activity Bottom Depth/Height Unit` = "",
     `Activity Relative Depth Name` = "",
-    #`Activity Comment` = rename "note
-    #`Characteristic Name` = rename "analyte"
-    #`Result Analytical Method ID` = rename "epa_analysis_id"
-    #`Result Analytical Method Context` = rename "context_code"
+    `Activity Comment` = note,
+    `Characteristic Name` = analyte,
+    `Result Analytical Method ID` = epa_analysis_id,
+    `Result Analytical Method Context` = context_code,
     #`Method Speciation` = *
-    #`Result Value` =  rename "result"
-    #`Result Unit` = rename "unit"
-    #`Result Qualifier` = rename "qualifier"
+    `Result Value` =  result,
+    `Result Unit` = units,
+    `Result Qualifier` = resultflag,
     `Result Weight Basis` = "Sampled",
-    `Statistical Base Code` = "",
-    #`Result Sample Fraction` = need to assign based on sample collection type
-    #`Result Value Type` = do actual in most cases, ask DEC about preference for blank correction
+    
+   # `Statistical Base Code` = "", # may need to ask
+   
+    #`Result Sample Fraction` = need to assign based on sample collection type  ## create match table w/ analytical method. total metals = Unfiltered. diss metals = Filtered, field. tss = suspended. 
+   
+    `Result Value Type` = "Actual",
     #`Result Comment` = ""
     `Sample Collection Method ID` = "",
     `Equipment ID` = "Water Bottle",
@@ -843,12 +829,12 @@ z <- sgs21 %>%
     #`Result Detection Limit Value` = 
     #`Result Detection Limit Unit` = 
     #`Laboratory Accreditation Indicator` = 
-    #`Laboratory Name` = rename
-    #`Laboratory Sample ID` = 
-    #`Analysis Start Date` = 
-    #`Analysis Start Time` = 
-    #`Biological Intent` = 
-    #`Subject Taxonomic Name` =
+    `Laboratory Name` = lab_name,
+    `Laboratory Sample ID` = lab_sample,
+    `Analysis Start Date` = run_date,
+    `Analysis Start Time` = run_time,
+    `Biological Intent` = "",
+    `Subject Taxonomic Name` = ""
     #`Thermal Preservative` = 
     #`Sample Container Type` = 
     #`Sample Container Color` = 
