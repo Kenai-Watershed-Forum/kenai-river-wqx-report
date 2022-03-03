@@ -8,6 +8,7 @@ author: "Benjamin Meyer, Kenai Watershed Forum"
 date: "`r Sys.Date()`"
 output: html_document:
   code_folding: hide
+output: pdf_book
 ---
 
 # (APPENDIX) Appendix {.unnumbered}
@@ -16,7 +17,7 @@ output: html_document:
 
 ## Introduction
 
-Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the project Quality Assurance Project Plan (QAPP) [@kenaiwatershedforum2020] is accessible in the appropriate repository. Water quality data for this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET.
+Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the project Quality Assurance Project Plan (QAPP) is accessible in the appropriate repository. Water quality data for this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET.
 
 Section B10 of the 2020 QAPP describes data management details and responsible parties for each step of the data pipeline from observation to repository.
 
@@ -34,11 +35,22 @@ The code scripts below assembles water quality data from the three analytical la
 
 -   Soldotna Wastewater Treatment Plant (Soldotna, AK)
 
--   Taurianen Engineering (Soldotna, AK)
+-   Taurianen Engineering and Testing (Soldotna, AK)
 
 <br>
 
 ***
+
+```{r, include=FALSE, eval = FALSE}
+
+# this code hides the print output and content of ALL code chunks
+# when rendering PDF version, set this chunk option to eval = TRUE
+
+knitr::opts_chunk$set(
+  include = FALSE
+)
+```
+
 
 
 ##### Metals/Nutrients Lab Results (SGS Labs)
@@ -352,7 +364,8 @@ analysis_code_matching_table <- read_excel("other/input/AQWMS/analysis_code_matc
 aqwms_analytical_methods <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "Analytical Methods") %>%
   select("ID","Context Code") %>%
   clean_names() %>%
-  rename(epa_analysis_id = id) 
+  rename(epa_analysis_id = id) %>%
+  distinct()
 
 # join two tables above
 epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching_table, by = "epa_analysis_id") %>%
@@ -362,16 +375,14 @@ epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching
 
 # join EPA analysis IDs and context codes to overall dataset
 dat %<>%
-  left_join(epa_analysis_codes, by = "analytical_method")
+  left_join(epa_analysis_codes, by = "analytical_method") %>%
+  mutate(analytical_method = str_replace(analytical_method,"EP200.8","200.8"))
   # remove extraneous column
 
 # remove unneeded dfs
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 
-```
 
-
-```{r}
 
 ########################## Miscellaneous Steps #########################################
 
@@ -650,7 +661,7 @@ xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS 
 </summary>
 
 
-```{r}
+```{r, echo = F}
 # SWWTP Spring 2021 TSS data
 ## Reformat TSS data to match AQWMS template
 
@@ -744,16 +755,84 @@ swwtp_tss21 <- left_join(swwtp_tss21,swwtp_tss_sitenames)  %>%
 # join TSS data with overall dataset
 dat <- bind_rows(dat,swwtp_tss21)
 
+rm(swwtp_spring21,swwtp_tss_sitenames,swwtp_tss21)
+
 ```
 
 </details>
 
 
 ```{r, echo = F}
-# filter out lab blanks and positive lab controls
+
+############### Miscellaneous Steps for Overall Dataframe #################
+
+
+############# a.)  filter out lab blanks and positive lab controls ##################
 dat %<>%
   filter(!sample_condition %in% c("Lab Blank","Positive Control"))
 
+
+############ b.) match latitude and longitude coordinates to sites ##################
+
+## read in coordinates
+site_coords <- read_excel("other/input/AQWMS/AQWMS_template_matching_table.xlsx", sheet = "site_coordinates") %>%
+  remove_empty()
+
+## join coords to overall df
+dat <- left_join(dat,site_coords)
+
+
+############ c.) assign "result sample fraction" (e.g. filtered, dissolved, etc.) ############
+
+## read in manually organized table that pairs "result sample fraction" with "analytical method"
+result_sample_fraction <- read_excel("other/input/AQWMS/AQWMS_template_matching_table.xlsx", sheet = "result_sample_fraction") %>%
+  filter(!is.na(analytical_method)) %>%
+  select(-description)
+
+## join to table
+dat <- left_join(dat,result_sample_fraction)
+
+
+################ d.) assign "result detection condition"##############
+
+## read in manually assigned join table
+result_detection_condition <- read_excel("other/input/AQWMS/AQWMS_template_matching_table.xlsx", sheet = "result_detection_condition") %>%
+  clean_names() %>%
+  filter(!is.na(resultflag))
+
+## join to table
+## z <- dat %>% left_join(dat,result_detection_condition, by = "resultflag")
+
+## the attempt at left_join above is exhibiting nonsensical result for unclear reason. For now, define programmatically
+
+dat %<>%
+  mutate(result_detection_condition = case_when(
+    resultflag == "U" ~ "Not Detected",
+    resultflag == "J" ~ "Present Below Quantification Limit"))
+
+
+############### e.) assign chemical preservative type ################
+
+## read in table
+chemical_preservative <- read_excel("other/input/AQWMS/AQWMS_template_matching_table.xlsx", sheet = "chemical_preservative") %>%
+  filter(!is.na(preservative)) %>%
+  select(-description)
+
+## join to overall dataframe
+dat <- left_join(dat,chemical_preservative)
+
+
+############# f.) assign bottle type and color ######################
+
+## read in table
+bottle_type_color <- read_excel("other/input/AQWMS/AQWMS_template_matching_table.xlsx", sheet = "sample_container_type_color") %>%
+  select(-description) %>%
+  filter(!is.na(sample_container_type))
+
+## join to overall dataframe
+dat <- left_join(dat,bottle_type_color)
+
+rm(site_coords, result_sample_fraction, result_detection_condition, chemical_preservative, bottle_type_color)
 ```
 
 
@@ -787,11 +866,11 @@ z <- dat %>%
       !is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte,"-",sample_condition)),
     `Activity Start Date` = collect_date,
     `Activity Start Time` = collect_time,
-    #`Activity End Date` = "*",
-    #`Activity End Time` = "*",
-    #`Activity Latitude` = "*",
-    #`Activity Longitude` = "*",
-    #`Activity Source Map Scale` = "*",
+    `Activity End Date` = "",
+    `Activity End Time` = "",
+    `Activity Latitude` = latitude, 
+    `Activity Longitude` = longitude, 
+    `Activity Source Map Scale` = "",
     `Activity Type` = case_when(
       sample_condition == "DUP" ~ "Quality Control Field Replicate Msr/Obs",
       sample_condition == "Blank" ~ "Quality Control Sample-Trip Blank",
@@ -799,7 +878,7 @@ z <- dat %>%
     # All samples are surface grab samples. Depths are assigned across the board here as 6 inches (~15 cm) 
     `Activity Depth/Height Measure` = 15,
     `Activity Depth/Height Unit` = "cm",
-    # Next three column not applicable for surface grab samples
+    # Next three columns not applicable for surface grab samples
     `Activity Bottom Depth/Height Measure` = "",
     `Activity Bottom Depth/Height Unit` = "",
     `Activity Relative Depth Name` = "",
@@ -807,7 +886,7 @@ z <- dat %>%
     `Characteristic Name` = analyte,
     `Result Analytical Method ID` = epa_analysis_id,
     `Result Analytical Method Context` = context_code,
-    #`Method Speciation` = *
+    `Method Speciation` = "",
     `Result Value` =  result,
     `Result Unit` = units,
     `Result Qualifier` = resultflag,
@@ -815,32 +894,36 @@ z <- dat %>%
     
    # `Statistical Base Code` = "", # may need to ask
    
-    #`Result Sample Fraction` = need to assign based on sample collection type  ## create match table w/ analytical method. total metals = Unfiltered. diss metals = Filtered, field. tss = suspended. 
+    `Result Sample Fraction` = result_sample_fraction, 
    
     `Result Value Type` = "Actual",
     #`Result Comment` = ""
     `Sample Collection Method ID` = "",
     `Equipment ID` = "Water Bottle",
-    #`Result Detection Condition` = assign based on result qualifiers
+    `Result Detection Condition` = result_detection_condition,
+   
+   # potentially a complex process here 3/2/2022
+   
     #`Result Detection Limit Type` = 
     #`Result Detection Limit Value` = 
     #`Result Detection Limit Unit` = 
     #`Result Detection Limit Type` = 
     #`Result Detection Limit Value` = 
-    #`Result Detection Limit Unit` = 
+   
+    `Result Detection Limit Unit` = units,
     #`Laboratory Accreditation Indicator` = 
     `Laboratory Name` = lab_name,
     `Laboratory Sample ID` = lab_sample,
     `Analysis Start Date` = run_date,
     `Analysis Start Time` = run_time,
     `Biological Intent` = "",
-    `Subject Taxonomic Name` = ""
-    #`Thermal Preservative` = 
-    #`Sample Container Type` = 
-    #`Sample Container Color` = 
-    #`Chemical Preservative` = 
+    `Subject Taxonomic Name` = "",
+    `Thermal Preservative` = "Cold packs",
+    `Sample Container Type` = sample_container_type,
+    `Sample Container Color` = sample_container_color,
+    `Chemical Preservative` = preservative
 
-    )
+    ,.keep = "unused")
   # rename cols already present
   
    
@@ -871,7 +954,11 @@ z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
 
 ### 1st step:::: make sure that monitoring list locations matches those currently match those in DEC AQWMS database (AWQMS public login: https://awqms2.goldsystems.com/Login.aspx, username akpublic, no password)
 
-
+z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
+  clean_names() %>%
+  select(result_detection_condition_text,)
+  select(characteristic_name, result_sample_fraction_text,result_analytical_method_method_name) %>%
+  distinct()
 
 
 
