@@ -839,11 +839,15 @@ rm(site_coords, result_sample_fraction, result_detection_condition, chemical_pre
 Notes:
 - we have LAB duplicates from ALS and others... need to retain for internal qa/qc but not submit to aqwms
 
-3/1/22 -- all we are missing for 2021 is the EDD file for summer ALS data. Integrate in pipeline when available. Good to proceed with final formatting!
+3/3/22 Issues
+
+Still missing 2021 EDD file for summer ALS data. Integrate in pipeline when available.
 
 Need to figure out how to segregate and designate BTEX Trip Blanks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! (see 'activity type')
 
-working here to un-hashtag one by one
+various types of blanks all named "trip blanks" 
+
+need to figure out statistical base code
 
 
 ```{r, eval = F, echo = F}
@@ -852,12 +856,12 @@ working here to un-hashtag one by one
 
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
-z <- dat %>%
+dat %<>%
   # Proceeding left to right across columns of AWQMS template
   # Mutate new column or rename existing column as needed
   
-  rename(`Monitoring Location ID` = "monitoring_location_id") %>%
   mutate(
+    `Monitoring Location ID` = monitoring_location_id,
     `Activity Media Name` = "Water",
     `Activity Media Subdivision Name` = "Surface Water",
     # create activity ID name conditionally if condition(s) present
@@ -879,6 +883,8 @@ z <- dat %>%
     `Activity Depth/Height Measure` = 15,
     `Activity Depth/Height Unit` = "cm",
     # Next three columns not applicable for surface grab samples
+    `Activity Top Depth/Height Measure` = "",
+    `Activity Top Depth/Height Unit` = "",
     `Activity Bottom Depth/Height Measure` = "",
     `Activity Bottom Depth/Height Unit` = "",
     `Activity Relative Depth Name` = "",
@@ -892,26 +898,26 @@ z <- dat %>%
     `Result Qualifier` = resultflag,
     `Result Weight Basis` = "Sampled",
     
-   # `Statistical Base Code` = "", # may need to ask
+    #### need to resolve this one ####
+    `Statistical Base Code` = "", # may need to ask
    
     `Result Sample Fraction` = result_sample_fraction, 
-   
     `Result Value Type` = "Actual",
-    #`Result Comment` = ""
+    `Result Comment` = "",
     `Sample Collection Method ID` = "",
     `Equipment ID` = "Water Bottle",
     `Result Detection Condition` = result_detection_condition,
    
-   # potentially a complex process here 3/2/2022
+   # potentially a complex process here 3/2/2022 - sent email to DEC to clarify how to deal w/ duplicate column names
    
-    #`Result Detection Limit Type` = 
-    #`Result Detection Limit Value` = 
-    #`Result Detection Limit Unit` = 
-    #`Result Detection Limit Type` = 
-    #`Result Detection Limit Value` = 
-   
-    `Result Detection Limit Unit` = units,
-    #`Laboratory Accreditation Indicator` = 
+    `Result Detection Limit Type 1` = "Limit of Quantitation",
+    `Result Detection Limit Value 1` = loq,
+    `Result Detection Limit Unit 1` = units,
+   # note: lod = "limit of detecion"; equivalent to "method detection level"
+    `Result Detection Limit Type 2` = "Method Detection Level",
+    `Result Detection Limit Value 2` = lod,
+    `Result Detection Limit Unit 2` = units,
+    `Laboratory Accreditation Indicator` = "",
     `Laboratory Name` = lab_name,
     `Laboratory Sample ID` = lab_sample,
     `Analysis Start Date` = run_date,
@@ -922,22 +928,20 @@ z <- dat %>%
     `Sample Container Type` = sample_container_type,
     `Sample Container Color` = sample_container_color,
     `Chemical Preservative` = preservative
-
+    # remove columns that were mutated to a new name
     ,.keep = "unused")
-  # rename cols already present
-  
-   
 
-    
+   
+# next, we want top retain just those columns listed in the AQWMS template
+# found solution to this problem here: https://gist.github.com/djhocking/62c76e63543ba9e94ebe
 
 # get all column names from AQWMS template
 aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", sheet = "KWF Baseline AWQMS Template") %>%
-  names() %>%
-  data.frame()
+  colnames()
 
-# reorder columns using read in list from aqwms template
-
-
+# select from subset of column in aqwms template
+ dat %<>%
+  select(one_of(aqwms_colnames))
 
 ```
 
@@ -945,7 +949,7 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
 # check out example from other WQP download
 z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
   #filter(CharacteristicName == "Fecal Coliform")
-  select(ActivityStartDate,CharacteristicName) %>%
+ # select(ActivityStartDate,CharacteristicName) %>%
   clean_names() %>%
   transform(activity_start_date = ymd(activity_start_date)) %>%
   group_by(characteristic_name) %>%
