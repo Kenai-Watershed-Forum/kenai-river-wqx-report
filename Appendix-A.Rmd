@@ -100,7 +100,7 @@ xfun::pkg_load2(c("htmltools", "mime"))
 spring21_sample_date <- "5/11/2021"
 
 # Summer 2021 Sampling Date
-summer21_sample_date <-"8/27/2021"
+summer21_sample_date <-"7/27/2021"
 ```
 
 
@@ -123,8 +123,7 @@ summer_batch_sgs21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/S
 sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
   clean_names() %>%
   remove_empty() %>%
-  # retain only field sample results
-  filter(str_detect(project_id,"Kenai")) %>%
+  
   # remove unneeded columns
   select(-project_id)%>%
   rename(sample = sample_id,
@@ -220,7 +219,29 @@ als21 <- spring_als21 %>%
 # join SGS data with ALS data
 dat <- bind_rows(sgs21,als21)  
 
+# export table of sample types
+
 rm(als21,sgs21,spring_als21)
+
+
+## assign sample type acronyms just like with sgs21 samples. see excel file for full definitions
+
+# --> make sure doesn't conflict with other sample_type designations in rest of document. use same acronyms
+
+
+### export table of sample types, then manually translate their abbreviations
+sample_types <- dat %>%
+  select(sample_type,lab_name) %>%
+  distinct()
+
+# remove old version and write new one
+unlink("other/input/AQWMS/sample_type_abbreviations.xlsx")
+write.xlsx(sample_types, "other/input/AQWMS/sample_type_abbreviations.xlsx")
+
+# manually created a translation of all the acronyms in an accompanying file. removed inconsistencies in sample type abbreviations into one consistent schema between SGS and ALS labs
+
+# assign new schema in later steps towards final
+
 
 
 
@@ -229,7 +250,7 @@ rm(als21,sgs21,spring_als21)
 # Upon visual inspection of site names, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
 
   
-# move info about duplicate sample and/or sample blank status into separate column
+# move info about duplicate sample and/or sample blank status into separate column, "sample_condition"
 dat %<>%
   mutate(sample_condition = case_when(
     grepl("Blank",sample) ~ "Blank",
@@ -239,7 +260,7 @@ dat %<>%
   mutate(sample = str_replace(sample, "DUP|Dup", "")) 
 
   
-# remove from "sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only want a list of unique sites. (Solution for this step found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
+# remove from "sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only site info in this column. (Solution for this step was found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
 dat %<>%  
   mutate(sample = (str_replace(sample, "Diss|Dis|DUP|Dup",""))) %>%
   
@@ -377,7 +398,6 @@ epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching
 dat %<>%
   left_join(epa_analysis_codes, by = "analytical_method") %>%
   mutate(analytical_method = str_replace(analytical_method,"EP200.8","200.8"))
-  # remove extraneous column
 
 # remove unneeded dfs
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
@@ -394,11 +414,22 @@ dat %<>%
     sample_type != "DUP1" ~ sample_condition))
 
 
-# issue: the ALS Electronic Data Deliverables do not include sample collection time, only date. But - we have the sample collection times populated for all the SGS data. The collection time is identical for both since they're from the same sample.
+# segregate laboratory QA/QC data from field data. These data will be evaluated at a late step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
+sgs21_als21_qaqc_dat <- dat %>%
+    # retain only non-field sample results
+   filter(!sample_type %in% c("PS","SMPL","TB","DUP1"))
+write.csv(sgs21_als21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/sgs21_als21_qaqc_dat.csv")
+
+dat %<>%
+    # retain only non-field sample results
+   filter(sample_type %in% c("PS","SMPL","TB","DUP1"))
+
+
+
+
+# remaining issue: the ALS Electronic Data Deliverables do not include sample collection time, only date. But - we have the sample collection times populated for all the SGS data. The collection time is identical for both since they're from the same sample.
 
 # solve this issue by creating a matching table a.) creating csv of all iterations of location; b.) populate this spreadsheet with manually entered times from ALS pdf, c.) import and left_join this df back to the main dataframe, then c.) delete the old collect_time column
-
-
 
 # WORKING HERE 2/25/22 TO RECITIFY COLLECT TIME ISSUE DESCRIBED... WAIT TO SEE IF ALS CAN PROVIDE DATA IN EDD BEFORE PURSUING !!! Might not be essential info
 
@@ -530,17 +561,34 @@ swwtp_spring21 %<>%
          units = "cfu/100ml",
          # reporting limit ("loq") value from 2019 QAPP, pg 17
          loq = 1.0,
-         lab_name = "Soldotna Wastewater Treatment Plant",
+         lab_name = "Soldotna Wastewater Treatment Plant, Soldotna, Alaska",
          units = "cfu/100ml",
          epa_analysis_id = "9222D",
          context_code = "APHA",
          analyst = "AW") %>%
   clean_names() %>%
   select(-ml,-colony_count) %>%
+  
   # transform to prep for bind with sgs21
   transform(lab_sample = as.character(lab_sample),
-            result = as.double(result)) 
- 
+            result = as.double(result)) %>%
+  
+  # create "sample_type" column
+  mutate(sample_type = case_when(
+    sample_condition == "Lab Blank" ~ "MB", # method blank
+    sample_condition == "Positive Control" ~ "LCS" # laboratory control sample
+  ))
+
+
+# segregate lab results from field results
+swwtp_spring21_qaqc_dat <- swwtp_spring21 %>%
+  filter(sample_type %in% c("MB","LCS"))
+write.csv(swwtp_spring21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/swwtp_spring21_qaqc_dat.csv")
+
+swwtp_spring21 %<>%
+  filter(!sample_type %in% c("MB","LCS"))
+
+
 ## join SGS 2021 data to Spring 2021 Fecal Coliform data from SWWTP
 
 dat <- bind_rows(dat,swwtp_spring21) %>%
@@ -548,7 +596,17 @@ dat <- bind_rows(dat,swwtp_spring21) %>%
 
 rm(swwtp_spring21)
 
+```
 
+
+
+
+WORKING HERE 3/4/22 -- SEGREGATING LAB QAQC FROM FIELD RESULTS. SAVE TO SEPERATE CSVS AND SUMMARISE/ANALYSE LATER
+
+
+
+
+```{r}
 
 
 ########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
@@ -849,6 +907,8 @@ various types of blanks all named "trip blanks"
 
 need to figure out statistical base code
 
+find and fix appearance of  "2021-08-27" date
+
 
 ```{r, eval = F, echo = F}
 # remove "client sample"
@@ -945,6 +1005,12 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
 
 ```
 
+<br>
+
+
+... we have retained only field data here. see section "DEC Data Evaluation Checklist" for evaluation of laboratory QA/QC data.
+
+
 ```{r, eval = F, echo = F}
 # check out example from other WQP download
 z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
@@ -963,8 +1029,6 @@ z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
   select(result_detection_condition_text,)
   select(characteristic_name, result_sample_fraction_text,result_analytical_method_method_name) %>%
   distinct()
-
-
 
 
 ```
