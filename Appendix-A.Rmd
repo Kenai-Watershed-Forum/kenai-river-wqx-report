@@ -601,7 +601,7 @@ rm(swwtp_spring21)
 
 
 
-WORKING HERE 3/4/22 -- SEGREGATING LAB QAQC FROM FIELD RESULTS. SAVE TO SEPERATE CSVS AND SUMMARISE/ANALYSE LATER
+WORKING HERE 3/4/22 -- SEGREGATING LAB QA/QC FROM FIELD RESULTS. SAVE TO SEPERATE CSVS AND SUMMARISE/ANALYSE LATER
 
 
 
@@ -822,12 +822,12 @@ rm(swwtp_spring21,swwtp_tss_sitenames,swwtp_tss21)
 
 ```{r, echo = F}
 
-############### Miscellaneous Steps for Overall Dataframe #################
+############### Miscellaneous Steps for Overall Field Results Dataframe #################
 
 
 ############# a.)  filter out lab blanks and positive lab controls ##################
 dat %<>%
-  filter(!sample_condition %in% c("Lab Blank","Positive Control"))
+  filter(!sample_condition %in% c("Lab Blank","Positive Control")) # should already be gone now 3/4/22
 
 
 ############ b.) match latitude and longitude coordinates to sites ##################
