@@ -164,19 +164,14 @@ rm(spring_batch_sgs21,summer_batch_sgs21)
 # 2/24/2022 - receiving EDD (electronic data deliverables) from ALS. Try it out with spring 2021
 
 #### read in spring 2021 results from ALS 
-spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv")
-#%>%
- # mutate(sample_date = spring21_sample_date)
-  
-  #### --> when SUMMER 2021 results are received, bind/join them here <-- ####
+spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv") %>%
+    clean_names() 
+summer_als21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_als_batch_info.csv") %>%
+    clean_names()
 
-# summer_als21 <- 
 
-# <-- join
-
-als21 <- spring_als21 %>%
-  
-  clean_names() %>%
+# bind spring and summer
+als21 <- bind_rows(spring_als21,summer_als21) %>%
   remove_empty() %>%
   
   # proceed left to right of existing ALS dataframe to make its naming structure match the sgs21 dataframe. Add, remove, modify column names as needed
@@ -184,16 +179,18 @@ als21 <- spring_als21 %>%
          -project,
          -service_request) %>%
   rename(lab_sample = lab_code) %>%
-  rename(collect_date = date_collected,
+  rename(
+         collect_date = date_collected,
+         collect_time = time_collected,
          rec_date = date_received,
          # sample_type ::: not sure where to match with sgs data yet or where to put in aqwms, but is important for qa/qc
+         
          extracted_date = date_extracted,
          extraction_code = extraction_method,
          run_date = date_analyzed,
          analytical_method = method,
          #units = units,
          analyte = component,
-
          resultflag = result_notes,
          amount_spiked = spike_concentration,
          percent_recovered = percent_recovery,
@@ -213,16 +210,30 @@ als21 <- spring_als21 %>%
             collect_date = mdy(collect_date),
             rec_date = mdy(rec_date),
             extracted_date = mdy(extracted_date),
-            result = as.double(result))
+            result = as.double(result),
+            collect_time = as_hms(as.POSIXct(collect_time, format = "%H:%M")))
 
 
 # join SGS data with ALS data
 dat <- bind_rows(sgs21,als21)  
 
+
+
+#### Working here 3/18/2022 ::: need to get missing collection times aplied eto spring 2021 ALS data. use generate/match unique values approach
+
+
+
+
+
+
+
+
+
+
+
+rm(als21,sgs21,spring_als21,summer_als21)
+
 # export table of sample types
-
-rm(als21,sgs21,spring_als21)
-
 
 ## assign sample type acronyms just like with sgs21 samples. see excel file for full definitions
 
@@ -241,6 +252,7 @@ write.xlsx(sample_types, "other/input/AQWMS/sample_type_abbreviations.xlsx")
 # manually created a translation of all the acronyms in an accompanying file. removed inconsistencies in sample type abbreviations into one consistent schema between SGS and ALS labs
 
 # assign new schema in later steps towards final
+# (3/18/2022 - WHAT DOES THIS MEAN?)
 
 
 
@@ -317,7 +329,10 @@ dat %<>%
 #  mutate(result = str_remove(result,"[aA-zZ]+")) 
 
 
+```
 
+
+```{r}
 ############## Part D: Prepare SGS/ALS Location/Site Names ##########################
 
 # NOTE: The SGS and ALS 2021 results have a variety of misspelling and typos. For 2022, we should provide labs with a csv file of site names that they can use
@@ -325,7 +340,8 @@ dat %<>%
 # In preparation for a join to AQWMS table, we will manually generate a match table csv file that we can use 
 
 ## generate list of unique site names from 2021 SGS data
-sgs21_sitenames <- data.table(unique(dat$sample)) 
+sgs21_sitenames <- data.table(unique(dat$sample)) %>%
+  arrange(V1)
   
 
 # generate list of unique site names from 2021 AQWMS template. these are the names we want in the final product
@@ -346,7 +362,7 @@ saveWorkbook(wb,site_match_table_path,overwrite = TRUE)
 
 # Using these two tables, we will manually create a new file titled "sgs_site_names_matching_table_manual_edit.xlsx" and manually match up the two disparate naming systems. 
 
-# Performed manually by B Meyer February 2022.
+# Performed manually by B Meyer March 18, 2022.
 
 # append "Monitoring Location Name" and "Monitoring Location ID" info from WQX to spring 2021 SGS data
 
@@ -414,7 +430,7 @@ dat %<>%
     sample_type != "DUP1" ~ sample_condition))
 
 
-# segregate laboratory QA/QC data from field data. These data will be evaluated at a late step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
+# segregate laboratory QA/QC data from field data. These data will be evaluated at a later step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
 sgs21_als21_qaqc_dat <- dat %>%
     # retain only non-field sample results
    filter(!sample_type %in% c("PS","SMPL","TB","DUP1"))
@@ -427,7 +443,7 @@ dat %<>%
 
 
 
-# remaining issue: the ALS Electronic Data Deliverables do not include sample collection time, only date. But - we have the sample collection times populated for all the SGS data. The collection time is identical for both since they're from the same sample.
+# remaining issue: the 2021 ALS Electronic Data Deliverables do not include sample collection time, only date. But - we have the sample collection times populated for all the SGS data. The collection time is identical for both since they're from the same sample.
 
 # solve this issue by creating a matching table a.) creating csv of all iterations of location; b.) populate this spreadsheet with manually entered times from ALS pdf, c.) import and left_join this df back to the main dataframe, then c.) delete the old collect_time column
 
