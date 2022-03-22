@@ -17,19 +17,19 @@ output: pdf_book
 
 ## Introduction
 
-Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the project Quality Assurance Project Plan (QAPP) is accessible in the appropriate repository. Water quality data for this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET.
-
-Section B10 of the 2020 QAPP describes data management details and responsible parties for each step of the data pipeline from observation to repository.
+Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the project Quality Assurance Project Plan (QAPP) is accessible in the appropriate repository. Water quality data for this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET. Section B10 of the 2020 QAPP describes data management details and responsible parties for each step of the data pipeline from observation to repository. The 2021 data review process is published here as an appendix as an example of the process applied annually to each year's data.
 
 ### 2021 Water Quality Data
 
-Water quality data generated from the Kenai River Baseline Water Quality Monitoring (KRBWQM) program was submitted to the Soldotna office of the Alaska Department of Environmental Conservation (ADEC) in January 2022 using the project-specific AQWMS Template provided by ADEC.
+Water quality data generated from the 2021 Kenai River Baseline Water Quality Monitoring (KRBWQM) program was submitted to the Soldotna office of the Alaska Department of Environmental Conservation (ADEC) in April 2022 using the project-specific spreadsheet provided by ADEC. The template is intended to prepare data for submission to the [Ambient Water Quality Data Management System](https://www.awqms.com/), the service that ADEC uses to manage water quality data.
 
-
+```{r, echo = F}
+xfun::embed_file('other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx', text = "Download the AQWMS Water Quality Data Spreadsheet Template")
+```
 
 #### 2021 Water Quality Data AQWMS Formatting
 
-The code scripts below assembles water quality data from the three analytical laboratories that partnered with Kenai Watershed Forum for this project in 2021:
+The code scripts below assemble water quality data from the three analytical laboratories that partnered with Kenai Watershed Forum for this project in 2021:
 
 -   SGS Laboratories (Anchorage, AK)
 
@@ -39,7 +39,7 @@ The code scripts below assembles water quality data from the three analytical la
 
 <br>
 
-***
+------------------------------------------------------------------------
 
 ```{r, include=FALSE, eval = FALSE}
 
@@ -50,8 +50,6 @@ knitr::opts_chunk$set(
   include = FALSE
 )
 ```
-
-
 
 ##### Metals/Nutrients Lab Results (SGS Labs)
 
@@ -72,7 +70,6 @@ xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021
 *Show/Hide Code used to Prepare 2021 Metals/Nutrients Results*
 
 </summary>
-
 
 ```{r, 2021 AQWMS formatting for SGS}
 
@@ -103,9 +100,7 @@ spring21_sample_date <- "5/11/2021"
 summer21_sample_date <-"7/27/2021"
 ```
 
-
-
-```{r, echo = F}
+```{r}
 ################################################################################################################
 ######################################### Read in  and Clean SGS/ALS Data ######################################
 ################################################################################################################
@@ -183,11 +178,14 @@ als21 <- bind_rows(spring_als21,summer_als21) %>%
          collect_date = date_collected,
          collect_time = time_collected,
          rec_date = date_received,
+         rec_time = time_received,
          # sample_type ::: not sure where to match with sgs data yet or where to put in aqwms, but is important for qa/qc
          
          extracted_date = date_extracted,
+         extracted_time = time_extracted,
          extraction_code = extraction_method,
          run_date = date_analyzed,
+         run_time = time_analyzed,
          analytical_method = method,
          #units = units,
          analyte = component,
@@ -206,10 +204,13 @@ als21 <- bind_rows(spring_als21,summer_als21) %>%
   # prep column classes to bind with sgs dataframe
   transform(analytical_method = as.character(analytical_method),
             run_date = mdy(run_date),
+            run_time = as_hms(as.POSIXct(run_time, format = "%H:%M")),
             #run_time = as_hms(run_time),
             collect_date = mdy(collect_date),
             rec_date = mdy(rec_date),
+            rec_time = as_hms(as.POSIXct(rec_time, format = "%H:%M")),
             extracted_date = mdy(extracted_date),
+            extracted_time = as_hms(as.POSIXct(extracted_time, format = "%H:%M")),
             result = as.double(result),
             collect_time = as_hms(as.POSIXct(collect_time, format = "%H:%M")))
 
@@ -218,16 +219,12 @@ als21 <- bind_rows(spring_als21,summer_als21) %>%
 dat <- bind_rows(sgs21,als21)  
 
 
-
+## correct missing collection times for ALS Spring 2021
 #### Working here 3/18/2022 ::: need to get missing collection times aplied eto spring 2021 ALS data. use generate/match unique values approach
 
+# also rec_time should be same for all of each of the 2021 dates? (spring: als received 5/14/21)
 
-
-
-
-
-
-
+# i think this is all good for now actually. check back later.
 
 
 
@@ -329,10 +326,8 @@ dat %<>%
 #  mutate(result = str_remove(result,"[aA-zZ]+")) 
 
 
-```
 
 
-```{r}
 ############## Part D: Prepare SGS/ALS Location/Site Names ##########################
 
 # NOTE: The SGS and ALS 2021 results have a variety of misspelling and typos. For 2022, we should provide labs with a csv file of site names that they can use
@@ -436,9 +431,10 @@ sgs21_als21_qaqc_dat <- dat %>%
    filter(!sample_type %in% c("PS","SMPL","TB","DUP1"))
 write.csv(sgs21_als21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/sgs21_als21_qaqc_dat.csv")
 
+
+# retain only non-field sample results for AQWMS export
 dat %<>%
-    # retain only non-field sample results
-   filter(sample_type %in% c("PS","SMPL","TB","DUP1"))
+   filter(sample_type %in% c("PS","SMPL","TB","DUP1","DUP"))
 
 
 
@@ -481,10 +477,9 @@ dat %<>%
 
 <br>
 
-***
+------------------------------------------------------------------------
 
 ##### Fecal Coliform Lab Results (Soldotna Wastewater Treatment Plant (SWWTP)/Taurianen Engineering)
-
 
 ```{r, echo = F}
 xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF Fecal 05-11-21.xls', text = "Download Original Spring 2021 Fecal Coliform Lab Results from SWWTP")
@@ -500,10 +495,9 @@ xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal
 
 <summary>
 
-*Show/Hide Code used to Prepare 2021 Fecal Coliform Results* 
+*Show/Hide Code used to Prepare 2021 Fecal Coliform Results*
 
 </summary>
-
 
 ```{r}
 
@@ -596,10 +590,10 @@ swwtp_spring21 %<>%
   ))
 
 
-# segregate lab results from field results
+# segregate lab results from field results, and write lab qa/qc results to external csv
 swwtp_spring21_qaqc_dat <- swwtp_spring21 %>%
   filter(sample_type %in% c("MB","LCS"))
-write.csv(swwtp_spring21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/swwtp_spring21_qaqc_dat.csv")
+write.csv(swwtp_spring21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/swwtp_spring21_fc_qaqc_dat.csv", row.names = F)
 
 swwtp_spring21 %<>%
   filter(!sample_type %in% c("MB","LCS"))
@@ -612,17 +606,6 @@ dat <- bind_rows(dat,swwtp_spring21) %>%
 
 rm(swwtp_spring21)
 
-```
-
-
-
-
-WORKING HERE 3/4/22 -- SEGREGATING LAB QA/QC FROM FIELD RESULTS. SAVE TO SEPERATE CSVS AND SUMMARISE/ANALYSE LATER
-
-
-
-
-```{r}
 
 
 ########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
@@ -645,7 +628,7 @@ taur_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taur
   mutate(collect_date = mdy(summer21_sample_date),
          run_date = mdy(summer21_sample_date),
          run_time = as_hms(time_relinquished),
-         analysis_date_out = mdy("8/28/2021"),
+         analysis_date_out = mdy("7/28/2021"),
          analysis_time_out = as_hms(time_tested), 
          # drop old columns
          .keep = "unused") %>%
@@ -655,9 +638,10 @@ taur_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taur
 ## add lab name
   mutate(lab_name = "Taurianen Engineering and Testing, Soldotna, Alaska") %>%
   
-  # 
+  # rename columns
   rename(sample = sample_location,
          collect_time = time_sampled)
+
   
 
 ## fix site naming and terminology
@@ -695,14 +679,26 @@ taur_summer21 %<>%
   transform(result = as.double(result))
 
 
+# assign "sample_type"
+taur_summer21 %<>%  mutate(sample_type = case_when(
+    sample_condition == "Lab Blank" ~ "MB", # method blank
+    sample_condition == "Positive Control" ~ "LCS", # laboratory control sample
+    TRUE ~ "PS"
+    ))
+
+
+
+# segregate lab results from field results, and write lab qa/qc results to external csv
+taur_summer21_qaqc_dat <- taur_summer21 %>%
+  filter(sample_type %in% c("MB","LCS"))
+write.csv(taur_summer21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/taur_summer21_qaqc_dat.csv", row.names = F)
+
+
 # join 2021 Taurianen Fecal Coliform data into overall dataframe so far
 dat <- bind_rows(dat,taur_summer21)
   
 
-rm(taur_summer21,taur_summer21_sites)
-
-# remaining issue(s)
-# collect time vs sample time
+rm(taur_summer21,taur_summer21_sites,taur_summer21_qaqc_dat)
 
 ```
 
@@ -710,12 +706,9 @@ rm(taur_summer21,taur_summer21_sites)
 
 <br>
 
-
-
-***
+------------------------------------------------------------------------
 
 ##### Total Dissolved Solids Lab Results (Soldotna Wastewater Treatment Plant (SWWTP))
-
 
 ```{r, echo = F}
 xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xlsx', text = "Download Original Spring 2021 Total Suspended Solids Results from SWWTP.xlsx")
@@ -725,17 +718,15 @@ xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS 
 xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xlsx', text = "Download Original Summer 2021 Total Suspended Solids Results from SWWTP.xlsx")
 ```
 
-
 <details>
 
 <summary>
 
-*Show/Hide Code used to Prepare 2021 Total Dissolved Solids Results* 
+*Show/Hide Code used to Prepare 2021 Total Dissolved Solids Results*
 
 </summary>
 
-
-```{r, echo = F}
+```{r}
 # SWWTP Spring 2021 TSS data
 ## Reformat TSS data to match AQWMS template
 
@@ -759,8 +750,12 @@ swwtp_tss21 <- bind_rows(swwtp_tss_spring21,swwtp_tss_summer21) %>%
 rm(swwtp_tss_spring21,swwtp_tss_summer21)
 
 # prepare and format to match larger dataset
+#swwtp_tss21 %<>%
+ 
+
+ # miscellaneous
+
 swwtp_tss21 %<>%
-  # miscellaneous
   select(-qc1,-data_entry,-x8) %>%
   rename(analysis_time = time) %>%
   transform(sample_time = as_hms(sample_time),
@@ -790,7 +785,8 @@ swwtp_tss21 %<>%
   # modify date/time formats
   mutate(collect_date = as.character(paste(field_sample_date,sample_time)),
          run_date_time = as.character(paste(date_of_analysis,analysis_time)), .keep = "unused") %>%
-  mutate(collect_date = ymd(collect_date),
+  mutate(collect_time = as_hms(as.POSIXct(collect_date))) %>%
+  mutate(collect_date = date(as.POSIXct(collect_date)),
          run_time = as_hms(ymd_hms(run_date_time)),
          run_date = date(ymd_hms(run_date_time)),.keep = "unused") %>%
   
@@ -806,6 +802,15 @@ swwtp_tss21 %<>%
          lab_name = "Soldotna Wastewater Treatment Plant, Soldotna, Alaska")
 
   
+# assign "sample_type"
+swwtp_tss21 %<>%  
+  mutate(sample_type = case_when(
+    sample_condition == "Lab Blank" ~ "MB", # method blank
+    sample_condition == "Positive Control" ~ "LCS", # laboratory control sample
+    TRUE ~ "PS"
+    ))
+
+
   
 # get site names consistent with AWQMS format
 swwtp_tss_sitenames <- data.frame(unique(swwtp_tss21$sample_location))
@@ -826,6 +831,17 @@ swwtp_tss21 <- left_join(swwtp_tss21,swwtp_tss_sitenames)  %>%
   rename(sample = sample_location)
 
 
+######## 3/21/2022 --> no qa/qc results from SWWTP TSS on record yet. contact by email to see whats available. looking for labd duplicate and/or external qc check standard (pg 34 of QAPP)
+
+# segregate lab results from field results, and write lab qa/qc results to external csv
+#swwtp_tss21_qaqc_dat <- swwtp_tss21 %>%
+#  filter(sample_type %in% c("MB","LCS"))
+#write.csv(swwtp_tss21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/swwtp_tss21_qaqc_dat.csv", row.names = F)
+
+
+#rm(swwtp_tss21_qaqc_dat)
+
+
 # join TSS data with overall dataset
 dat <- bind_rows(dat,swwtp_tss21)
 
@@ -835,15 +851,24 @@ rm(swwtp_spring21,swwtp_tss_sitenames,swwtp_tss21)
 
 </details>
 
+------------------------------------------------------------------------
 
-```{r, echo = F}
+<details>
+
+<summary>
+
+*Additional Miscellaneous Code Used to Prepare Data For AQWMS Template*
+
+</summary>
+
+```{r}
 
 ############### Miscellaneous Steps for Overall Field Results Dataframe #################
 
 
 ############# a.)  filter out lab blanks and positive lab controls ##################
-dat %<>%
-  filter(!sample_condition %in% c("Lab Blank","Positive Control")) # should already be gone now 3/4/22
+#dat %<>%
+#  filter(!sample_condition %in% c("Lab Blank","Positive Control")) # should already be gone now 3/4/22
 
 
 ############ b.) match latitude and longitude coordinates to sites ##################
@@ -867,6 +892,7 @@ result_sample_fraction <- read_excel("other/input/AQWMS/AQWMS_template_matching_
 dat <- left_join(dat,result_sample_fraction)
 
 
+
 ################ d.) assign "result detection condition"##############
 
 ## read in manually assigned join table
@@ -877,7 +903,7 @@ result_detection_condition <- read_excel("other/input/AQWMS/AQWMS_template_match
 ## join to table
 ## z <- dat %>% left_join(dat,result_detection_condition, by = "resultflag")
 
-## the attempt at left_join above is exhibiting nonsensical result for unclear reason. For now, define programmatically
+## the attempt at left_join above is exhibiting nonsensical result for unclear reason. For now, define programmatically:
 
 dat %<>%
   mutate(result_detection_condition = case_when(
@@ -907,27 +933,18 @@ bottle_type_color <- read_excel("other/input/AQWMS/AQWMS_template_matching_table
 dat <- left_join(dat,bottle_type_color)
 
 rm(site_coords, result_sample_fraction, result_detection_condition, chemical_preservative, bottle_type_color)
-```
 
 
-Notes:
-- we have LAB duplicates from ALS and others... need to retain for internal qa/qc but not submit to aqwms
 
-3/3/22 Issues
+############ g.) assign "Statistical Base Code" column ##############
 
-Still missing 2021 EDD file for summer ALS data. Integrate in pipeline when available.
+# this value is not applicable to most results here, usually left blank. will assign "count": to fecal coliform
 
-Need to figure out how to segregate and designate BTEX Trip Blanks !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! (see 'activity type')
+dat %<>%
+  mutate(stat_base_code = case_when(
+    analyte == "Fecal Coliform" ~ "Count"
+  ))
 
-various types of blanks all named "trip blanks" 
-
-need to figure out statistical base code
-
-find and fix appearance of  "2021-08-27" date
-
-
-```{r, eval = F, echo = F}
-# remove "client sample"
 
 
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
@@ -973,10 +990,7 @@ dat %<>%
     `Result Unit` = units,
     `Result Qualifier` = resultflag,
     `Result Weight Basis` = "Sampled",
-    
-    #### need to resolve this one ####
-    `Statistical Base Code` = "", # may need to ask
-   
+    `Statistical Base Code` = stat_base_code,
     `Result Sample Fraction` = result_sample_fraction, 
     `Result Value Type` = "Actual",
     `Result Comment` = "",
@@ -985,6 +999,7 @@ dat %<>%
     `Result Detection Condition` = result_detection_condition,
    
    # potentially a complex process here 3/2/2022 - sent email to DEC to clarify how to deal w/ duplicate column names
+   # reply: renaming as 1 and 2 OK for now
    
     `Result Detection Limit Type 1` = "Limit of Quantitation",
     `Result Detection Limit Value 1` = loq,
@@ -1018,13 +1033,72 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
 # select from subset of column in aqwms template
  dat %<>%
   select(one_of(aqwms_colnames))
+ 
+# export final formatted AQWMS results to external csv
+write.csv(dat,"other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv",row.names = F)
+```
+
+</details>
+
+<br>
+
+------------------------------------------------------------------------
+
+<br>
+
+### Provisional Results
+
+*Results last updated `r Sys.Date()`*
+
+```{r, echo = F}
+xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv', text = "Download All 2021 Kenai River Baseline Water Quality Monitoring Results, Formatted for AQWMS")
 
 ```
 
 <br>
 
+### Data Evaluation
 
-... we have retained only field data here. see section "DEC Data Evaluation Checklist" for evaluation of laboratory QA/QC data.
+Prior to consideration for elevation to the [EPA Water Quality Portal](https://www.epa.gov/waterdata/water-quality-data), all water quality data must address a series of data evaluation questions from ADEC in order to evaluate how quality assurance / quality check (QA/QC) processes are instituted. The draft Data Evaluation Checklist Template outlines these questions.
+
+```{r, echo = F}
+xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Template_20220201.docx', text = "Download Draft ADEC Draft Data Evaluation Checklist Template")
+```
+
+#### Overall Project Success
+
+1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***TBD***
+
+2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
+
+3.  Are site names, dates, and times correct and as expected? ***Yes*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for transcription errors. Remaining site name transcription errors were corrected in post-season data review.
+
+4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. We acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice, and all water sample collections were successfully conducted. However intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021. Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`:
+
+-   Enter Completeness Goal from QAPP (%): ***TBD***
+
+-   Enter Project Completeness (%): ***TBD***
+
+
+5. WORKING HERE 3/21/2022 --- REVIEW INVENTYORY FIRST!!!
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 ```{r, eval = F, echo = F}
@@ -1048,10 +1122,6 @@ z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
 
 
 ```
-
-
-
-
 
 ```{r, notes, include = F}
 
