@@ -1,5 +1,8 @@
 # References {-}
 
-List pasted from Zotero library, and link to online library:
+<div id="refs"></div>
+
+
+See also: list from project Zotero library:
 
 <https://www.zotero.org/groups/4571804/kenai-river-water-quality-assessment>

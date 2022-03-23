@@ -13,15 +13,19 @@ output: pdf_book
 
 # (APPENDIX) Appendix {.unnumbered}
 
-# Appendix: Data Uplift to EPA WQX
+# Appendix: Data Review and Uplift
 
 ## Introduction
 
-Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the project Quality Assurance Project Plan (QAPP) is accessible in the appropriate repository. Water quality data for this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET. Section B10 of the 2020 QAPP describes data management details and responsible parties for each step of the data pipeline from observation to repository. The 2021 data review process is published here as an appendix as an example of the process applied annually to each year's data.
+Prior to analysis and interpretation of water quality data, we will ensure that all data that meets QA/QC standards outlined in the current project [Quality Assurance Project Plan (QAPP)](https://paperpile.com/app/p/7703451b-460d-00b4-82a0-1086ea2554c3) is accessible in the appropriate repository.
+
+Water quality data from this project is ultimately destined for the EPA Water Quality Exchange (EPA WQX), formerly EPA STORET. The process of transferring these data to the higher-level EPA repository is described as data "Uplift."
+
+Section B10 of the 2020 QAPP describes data management details and responsible parties for each step of the data pipeline from observation to repository. The 2021 data review process is published here as an appendix as an example of the process applied annually to each year's data.
 
 ### 2021 Water Quality Data
 
-Water quality data generated from the 2021 Kenai River Baseline Water Quality Monitoring (KRBWQM) program was submitted to the Soldotna office of the Alaska Department of Environmental Conservation (ADEC) in April 2022 using the project-specific spreadsheet provided by ADEC. The template is intended to prepare data for submission to the [Ambient Water Quality Data Management System](https://www.awqms.com/), the service that ADEC uses to manage water quality data.
+Water quality data generated from the 2021 Kenai River Baseline Water Quality Monitoring (KRBWQM) program will be submitted to the Soldotna office of the Alaska Department of Environmental Conservation (ADEC) in April 2022 using the project-specific spreadsheet template provided by ADEC. The template is intended to prepare data for submission to the [Ambient Water Quality Data Management System](https://www.awqms.com/), the service that ADEC uses to manage water quality data.
 
 ```{r, echo = F}
 xfun::embed_file('other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx', text = "Download the AQWMS Water Quality Data Spreadsheet Template")
@@ -1046,12 +1050,12 @@ write.csv(dat,"other/output/aqwms_formatted_results/2021_kwf_baseline_results_aq
 
 <br>
 
-### Provisional Results
+### Provisional Results, Prior to Data Review
 
 *Results last updated `r Sys.Date()`*
 
 ```{r, echo = F}
-xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv', text = "Download All 2021 Kenai River Baseline Water Quality Monitoring Results, Formatted for AQWMS")
+xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv', text = "Download All Provisional 2021 Kenai River Baseline Water Quality Monitoring Results, Formatted for AQWMS")
 
 ```
 
@@ -1059,47 +1063,129 @@ xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results
 
 ### Data Evaluation
 
-Prior to consideration for elevation to the [EPA Water Quality Portal](https://www.epa.gov/waterdata/water-quality-data), all water quality data must address a series of data evaluation questions from ADEC in order to evaluate how quality assurance / quality check (QA/QC) processes are instituted. The draft Data Evaluation Checklist Template outlines these questions.
+Prior to submission to ADEC, all water quality data must address a series of data evaluation questions in order to evaluate how quality assurance / quality check (QA/QC) processes are instituted. The draft Data Evaluation Checklist Template (available below) outlines these questions:
 
 ```{r, echo = F}
 xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Template_20220201.docx', text = "Download Draft ADEC Draft Data Evaluation Checklist Template")
 ```
 
-#### Overall Project Success
+#### Pre-Database
 
-1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***TBD***
+##### Overall Project Success
+
+1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***Refer to Individual Answers Below***
 
 2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
 
-3.  Are site names, dates, and times correct and as expected? ***Yes*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for transcription errors. Remaining site name transcription errors were corrected in post-season data review.
+3.  Are site names, dates, and times correct and as expected? ***Yes*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
 
-4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. We acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice, and all water sample collections were successfully conducted. However intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021. Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`:
+4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021.
 
--   Enter Completeness Goal from QAPP (%): ***TBD***
+Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
 
--   Enter Project Completeness (%): ***TBD***
+```{r, echo = F}
 
+# note 3/22/22 --- we might need to execute/hide all the code needed to populate these answers PRIOR TO their inline text. Because, values from multiple answers are needed to answer single questions and are not sequentially independent. for example question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #4.
 
-5. WORKING HERE 3/21/2022 --- REVIEW INVENTYORY FIRST!!!
-
-
-
+# completeness measures
 
 
+## measure A: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
+
+### table of samples collected
+z <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
+  clean_names()
 
 
-
-
-
-
-
-
+### table of samples finalized and submitted to DEC
 
 
 
 
+## measure B: use table for kit request to get total number of planned samples. compare this table to final set of values that hold up against qa/qc process
+```
 
 
+-   Completeness Measure A: (Samples Collected) / (Samples Submitted to ADEC) \*100% = ***%TBD***
+
+    -   Project goal: ***85%***
+
+-   Completeness Measure B: (Planned Number of Samples) / (Useable Samples) \* 100% = ***%TBD***
+
+    -   Project goal: ***60%***
+
+
+5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***Yes***
+
+```{r, echo = F}
+# How many field blanks, field duplicates, and other QC samples were collected?
+
+## plan: modify kit request to distinguish sample vs. above types. Create df of planned values (impr), join with actual sample summary value derived from aqwms pre-review submission
+```
+
+-   Field duplicates:
+
+    -   \# required
+    -   \# collected
+
+-   Field blanks:
+
+    -   \# required
+    -   \# collected
+
+-   Other:
+
+    -   \# required
+    -   \# collected
+
+6.  Are the duplicate sample(s) RPD within range described in QAPP? ***TBD***
+
+-   RPD goal from QAPP(%): ***Varies by Parameter, See Current QAPP***
+-   View duplicate RPD calculations and a summary table in supporting excel file; including parameters, site names, dates, results, and RPD values: ***Values TBD***
+
+```{r, echo= F}
+# generate table of rpd values and make csv downloadable
+```
+
+##### In-situ Field Data and Instruments
+
+7.  Were there any issues with instrument calibration? ***No***. Did the instrument perform as expected? ***Yes***. Notes: ***TBD***
+
+8.  Was instrument calibration performed according to the QAPP and instrument recommendations? ***Yes***. Were calibration logs or records kept? ***Yes***. Notes: ***Calibration records will be available for download here***.
+
+9.  Was instrument verification during the field season performed according to the QAPP and instrument recommendations? ***TBD*** . Were verification logs or records kept? ***Yes***.
+
+10. Do the instrument data files site IDs, time stamps and file names match? ***No electronic log files recorded***.
+
+11. Is any field data rejected and why? ***TBD***.
+
+##### Analytical Laboratory Reports and Results
+
+12. Do the laboratory reports provide results for all sites and parameters? ***Yes***.
+
+13. Were the appropriate analytical methods used for all parameters? ***Yes***.
+
+14. Do the laboratory reports match the COC and requested methods? ***TBD***. Are same methods used throughout? ***TBD***.
+
+15. Are the number of samples on the laboratory reports the same as on the COC? ***TBD***.
+
+16. Is a copy of the COC included with the laboratory reports? ***Yes***. GET COC FOR SWWTP 2021...
+
+17. Were preservation, hold time and temperature requirements met? ***Yes***. **Can provide calculation table to verify if necessary**.
+
+18. Are there any project specific concerns (e.g. total v. dissolved, MST, etc)? ***TBD***.
+
+19. Was all supporting info provided in the laboratory report, such as reporting limits for all analyses and definitions? ***Yes***.
+
+20. Were there any laboratory discrepancies, errors, data qualifiers, or QC failures (review laboratory duplicates, matrix spikes and blanks)? ***TBD***.
+
+21. Is any laboratory data rejected and why? ***TBD***.
+
+22. Was the QA Officer consulted for any data concerns? ***TBD***.
+
+<br>
+
+*Subsequent steps in the "Database Prep" and "Database Import" phases are conducted by ADEC staff. See the above Data Evaluation Checklist Template for details.*
 
 ```{r, eval = F, echo = F}
 # check out example from other WQP download
@@ -1140,8 +1226,6 @@ z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
 ```
 
 <br>
-
-## 2021 Baseline Water Quality Data
 
 ```{r, other notes, include = F}
 
