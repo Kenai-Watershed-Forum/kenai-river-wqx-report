@@ -160,7 +160,7 @@ rm(spring_batch_sgs21,summer_batch_sgs21)
 
 ## SGS subcontracted analyses of Ca, Fe, and Mg to ALS laboratories (Kelso, WA). These results are not included in the spreadsheet download from SGS engage and were entered manually in to seperate spring and summer "ALS" named spreadsheets
 
-# 2/24/2022 - receiving EDD (electronic data deliverables) from ALS. Try it out with spring 2021
+# 2/24/2022 - receiving EDD (electronic data deliverables) from ALS
 
 #### read in spring 2021 results from ALS 
 spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv") %>%
@@ -221,15 +221,6 @@ als21 <- bind_rows(spring_als21,summer_als21) %>%
 
 # join SGS data with ALS data
 dat <- bind_rows(sgs21,als21)  
-
-
-## correct missing collection times for ALS Spring 2021
-#### Working here 3/18/2022 ::: need to get missing collection times aplied eto spring 2021 ALS data. use generate/match unique values approach
-
-# also rec_time should be same for all of each of the 2021 dates? (spring: als received 5/14/21)
-
-# i think this is all good for now actually. check back later.
-
 
 
 rm(als21,sgs21,spring_als21,summer_als21)
@@ -411,8 +402,9 @@ epa_analysis_codes <- inner_join(aqwms_analytical_methods,analysis_code_matching
 
 # join EPA analysis IDs and context codes to overall dataset
 dat %<>%
-  left_join(epa_analysis_codes, by = "analytical_method") %>%
-  mutate(analytical_method = str_replace(analytical_method,"EP200.8","200.8"))
+  mutate(analytical_method = str_replace(analytical_method,"EP200.8","200.8")) %>%
+  left_join(epa_analysis_codes, by = "analytical_method") 
+
 
 # remove unneeded dfs
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
@@ -678,7 +670,7 @@ taur_summer21 %<>%
          units = "cfu/100ml",
          # loq = reporting limit
          loq = 1,
-         epa_analysis_id = "922D",
+         epa_analysis_id = "9222D",
          context_code = "APHA") %>%
   transform(result = as.double(result))
 
@@ -1040,6 +1032,16 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
  
 # export final formatted AQWMS results to external csv
 write.csv(dat,"other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv",row.names = F)
+
+
+
+
+
+
+#### to do
+
+# figure out whats the deal with BTEX surrogate ("surr") results
+
 ```
 
 </details>
@@ -1073,6 +1075,42 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 
 ##### Overall Project Success
 
+```{r, echo = F}
+
+# This code chunk will prepare values to be used in addressing the data review questions below. 
+
+# The code will be executed here rather than in individual chunks above each individual question, because some of the questions are not sequentially independent. 
+
+# That is to say, values from multiple questions are needed to answer single questions, sometimes from prior and sometimes from after a particular question. For example in question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #4.
+
+# 1.: No calculation needed.
+# 2.: No calculation needed.
+# 3.: No calculation needed.
+# 4.: Calculations needed
+
+## 4.1: Completeness Measure A: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
+
+### table of samples collected
+total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
+  clean_names() %>%
+  # unique location, date, parameter
+  distinct(monitoring_location_id, activity_start_date, characteristic_name, result_value) %>%
+  count() %>%
+  as.integer()
+
+
+### table of samples finalized and submitted to DEC
+
+
+
+## 4.2: Completeness Measure B: use table for kit request to get total number of planned samples. compare this table to final set of values that hold up against qa/qc process
+```
+
+
+
+
+
+
 1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***Refer to Individual Answers Below***
 
 2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
@@ -1082,28 +1120,6 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021.
 
 Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
-
-```{r, echo = F}
-
-# note 3/22/22 --- we might need to execute/hide all the code needed to populate these answers PRIOR TO their inline text. Because, values from multiple answers are needed to answer single questions and are not sequentially independent. for example question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #4.
-
-# completeness measures
-
-
-## measure A: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
-
-### table of samples collected
-z <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
-  clean_names()
-
-
-### table of samples finalized and submitted to DEC
-
-
-
-
-## measure B: use table for kit request to get total number of planned samples. compare this table to final set of values that hold up against qa/qc process
-```
 
 
 -   Completeness Measure A: (Samples Collected) / (Samples Submitted to ADEC) \*100% = ***%TBD***
@@ -1118,25 +1134,113 @@ z <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aq
 5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***Yes***
 
 ```{r, echo = F}
-# How many field blanks, field duplicates, and other QC samples were collected?
+# How many field blanks, field duplicates, and other QC samples were planned vs. collected?
 
-## plan: modify kit request to distinguish sample vs. above types. Create df of planned values (impr), join with actual sample summary value derived from aqwms pre-review submission
+################ A.) Count PLANNED 2021 field blanks/dups #################
+
+# use kit request data to count "required" (planned) samples
+
+## read in SPRING 2021 planned samples
+spring21_planned <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/KRBWQM_SGS_bottle_order_Spring_2021.xlsx", sheet = "bottles_analyses_spring_2021") %>%
+  mutate(activity_start_date = spring21_sample_date)
+
+## read in SUMMER 2021 planned samples
+summer21_planned <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/KRBWQM_SGS_bottle_order_Summer_2021.xlsx", sheet = "bottles_analyses_summer_2021") %>%
+  mutate(activity_start_date = summer21_sample_date)
+
+## combine spring and summer 2021
+planned_samples_2021 <- bind_rows(spring21_planned,summer21_planned) %>%
+  
+## prepare and summarise table samples collected and tests performed
+  clean_names() %>%
+  filter(item == "Bottle") %>%
+  select(site,container_size,quantity,preservative,analysis_1,analysis_2,activity_start_date) %>%
+  fill(site, .direction = "down") %>%
+  filter(site != "Spare Kit") %>%
+  mutate(sample_type = case_when(
+    grepl("DUPLICATE",site, ignore.case = TRUE) ~ "FIELD DUPLICATE",
+    grepl("blank",analysis_1, ignore.case = TRUE) ~ "FIELD BLANK"
+  )) 
+
+### make available for download? ... "planned sample collection 2021"
+
+
+## count planned field replicates
+planned_field_dups_2021 <- planned_samples_2021 %>%
+  filter(sample_type == "FIELD DUPLICATE") %>%
+  count() %>%
+  as.character()
+
+## count planned field blanks 
+planned_field_blanks_2021 <- planned_samples_2021 %>%
+  filter(sample_type == "FIELD BLANK") %>%
+  count() %>%
+  as.character()
+
+# remove
+rm(spring21_planned,summer21_planned)
+
+
+################ B.) Count ACTUALLY COLLECTED 2021 field blanks/dups #################
+
+z <- dat %>%
+  clean_names() %>%
+  filter(activity_type != "Field Msr/Obs") %>%
+  # assign each observation as dup or blank
+  mutate(sample_type = case_when(
+    grepl("DUP",activity_id, ignore.case = TRUE) ~ "FIELD DUPLICATE",
+    grepl("blank",activity_id, ignore.case = TRUE) ~ "FIELD BLANK")) %>%
+  select(activity_type,sample_type,result_analytical_method_id, activity_start_date, monitoring_location_id) %>%
+  distinct() %>%
+  # rearrange dataframe so that both phosphorus and nitrate tests are from same bottle
+  filter(result_analytical_method_id != "4500-P-E") %>%
+  rename(result_analytical_method_id_1 = result_analytical_method_id) %>%
+  mutate(result_analytical_method_id_2 = case_when(
+    result_analytical_method_id_1 == "4500-NO3(F)" ~ "4500-P-E"
+  )) %>%
+  select(activity_type,sample_type,activity_start_date,monitoring_location_id,result_analytical_method_id_1,result_analytical_method_id_2) %>%
+  arrange(monitoring_location_id,activity_start_date)
+
+write.csv(z,"other/output/temp.csv")
+
+
+
+
+
+
+
+# duplicate samples do not line up as expected.
+# working here 3/23/2022; working to ID why three extra 200.7 samples appear. see output/temp.csv
+
+
+
+
+# plan: do an anti_join with planned_samples_2021; find whats up, go back to arrange SGS code to repair...?!
+ planned_qaqc_samples_2021 <- planned_samples_2021 %>%
+   filter(!is.na(sample_type)) %>%
+   select(site,analysis_1,analysis_2,activity_start_date)
+
+
+
+
+
+## general plan: modify kit request to distinguish sample vs. above types. Create df of planned values (impr), join with actual sample summary value derived from aqwms pre-review submission
 ```
 
 -   Field duplicates:
 
-    -   \# required
+    -   \# required: ***`r planned_field_dups_2021`***
     -   \# collected
 
 -   Field blanks:
 
-    -   \# required
+    -   \# required: ***`r planned_field_blanks_2021`***
     -   \# collected
 
 -   Other:
 
-    -   \# required
-    -   \# collected
+    -   \# required: NA
+    -   \# collected: NA
 
 6.  Are the duplicate sample(s) RPD within range described in QAPP? ***TBD***
 
