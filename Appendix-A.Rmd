@@ -1111,11 +1111,23 @@ total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2
 
 
 
-1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***Refer to Individual Answers Below***
+1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***Yes. Refer to Individual Answers Below***
 
 2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
 
 3.  Are site names, dates, and times correct and as expected? ***Yes*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
+
+```{r, echo = F}
+
+# we have identified errors in site name / sample type transcription
+# manually create transmission chain of site/sample names for spring 2021
+# see excel document at other/input/2021_wqx_data/miscellaenous
+
+# go though and document coc to decide what data we can defend inclusion/exclusion of
+```
+
+
+
 
 4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021.
 
@@ -1131,7 +1143,7 @@ Data evaluation is currently in progress and the values below are current as of 
     -   Project goal: ***60%***
 
 
-5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***Yes***
+5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***No***
 
 ```{r, echo = F}
 # How many field blanks, field duplicates, and other QC samples were planned vs. collected?
