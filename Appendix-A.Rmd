@@ -160,7 +160,6 @@ rm(spring_batch_sgs21,summer_batch_sgs21)
 
 ## SGS subcontracted analyses of Ca, Fe, and Mg to ALS laboratories (Kelso, WA). These results are not included in the spreadsheet download from SGS engage and were entered manually in to seperate spring and summer "ALS" named spreadsheets
 
-# 2/24/2022 - receiving EDD (electronic data deliverables) from ALS
 
 #### read in spring 2021 results from ALS 
 spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv") %>%
@@ -219,6 +218,7 @@ als21 <- bind_rows(spring_als21,summer_als21) %>%
             collect_time = as_hms(as.POSIXct(collect_time, format = "%H:%M")))
 
 
+
 # join SGS data with ALS data
 dat <- bind_rows(sgs21,als21)  
 
@@ -243,9 +243,6 @@ write.xlsx(sample_types, "other/input/AQWMS/sample_type_abbreviations.xlsx")
 
 # manually created a translation of all the acronyms in an accompanying file. removed inconsistencies in sample type abbreviations into one consistent schema between SGS and ALS labs
 
-# assign new schema in later steps towards final
-# (3/18/2022 - WHAT DOES THIS MEAN?)
-
 
 
 
@@ -253,18 +250,27 @@ write.xlsx(sample_types, "other/input/AQWMS/sample_type_abbreviations.xlsx")
 
 # Upon visual inspection of site names, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
 
-  
+
+
+# 3/28/2022 - A note on addressing "Duplicate" designations. In QA/QC data review in March 2022 the following was clarified through trial and error: we must make a careful distinction between "Field Duplicates" and "Lab duplicates" when preparing this data. The sample names contain info about whether a result is from a "Field Duplicate," e.g., two field collections made at the same location/day/time. However the ALS lab also created "Lab Duplicates," which are not from the same sites as field duplicates, and designates these as "DUP1" in the "sample_type" column.
+
+# See AQWMS Activity Type column assign distinctions
+
+# Decision - we will designate the field duplicates simply as a Field Duplicate
+
+
 # move info about duplicate sample and/or sample blank status into separate column, "sample_condition"
 dat %<>%
   mutate(sample_condition = case_when(
-    grepl("Blank",sample) ~ "Blank",
-    grepl("DUP",sample) ~ "DUP",
-    grepl("Dup",sample) ~ "DUP")) %>%
+    grepl("Method Blank",sample) ~ "Method Blank",
+    grepl("Trip Blank",sample) ~ "Trip Blank",
+    grepl("DUP",sample) ~ "Field Duplicate",
+    grepl("Dup",sample) ~ "Field Duplicate")) %>%
   # remove "DUP" designation from sample column
   mutate(sample = str_replace(sample, "DUP|Dup", "")) 
 
   
-# remove from "sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only site info in this column. (Solution for this step was found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
+# remove from "sample" names the text containing the suffixes Diss/Dis (Dissolved metals sample) since we only  want location info in this column. (Solution for this step was found at https://stackoverflow.com/questions/29271549/replace-all-occurrences-of-a-string-in-a-data-frame)
 dat %<>%  
   mutate(sample = (str_replace(sample, "Diss|Dis|DUP|Dup",""))) %>%
   
@@ -415,57 +421,23 @@ rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 
 
 # move "DUP1" in sample_type column over to sample_condition as "DUP"
-dat %<>%
-  mutate(sample_condition = case_when(
-    sample_type == "DUP1" ~ "DUP",
-    sample_type != "DUP1" ~ sample_condition))
+#dat %<>%
+#  mutate(sample_condition = case_when(
+#    sample_type == "DUP1" ~ "DUP",
+#    sample_type != "DUP1" ~ sample_condition))
 
 
 # segregate laboratory QA/QC data from field data. These data will be evaluated at a later step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
 sgs21_als21_qaqc_dat <- dat %>%
-    # retain only non-field sample results
-   filter(!sample_type %in% c("PS","SMPL","TB","DUP1"))
+    # retain only results not from field sampling program
+   filter(!sample_type %in% c("PS","SMPL"))
 write.csv(sgs21_als21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/sgs21_als21_qaqc_dat.csv")
 
 
 # retain only non-field sample results for AQWMS export
 dat %<>%
-   filter(sample_type %in% c("PS","SMPL","TB","DUP1","DUP"))
+   filter(sample_type %in% c("PS","SMPL"))
 
-
-
-
-# remaining issue: the 2021 ALS Electronic Data Deliverables do not include sample collection time, only date. But - we have the sample collection times populated for all the SGS data. The collection time is identical for both since they're from the same sample.
-
-# solve this issue by creating a matching table a.) creating csv of all iterations of location; b.) populate this spreadsheet with manually entered times from ALS pdf, c.) import and left_join this df back to the main dataframe, then c.) delete the old collect_time column
-
-# WORKING HERE 2/25/22 TO RECITIFY COLLECT TIME ISSUE DESCRIBED... WAIT TO SEE IF ALS CAN PROVIDE DATA IN EDD BEFORE PURSUING !!! Might not be essential info
-
-
-#z <- dat %>%
- # filter(analytical_method == "EP200.8") %>%
-#  select(monitoring_location_id,collect_date,collect_time,analytical_method,sample_condition) %>%
-#  distinct()
-
-#z1 <- dat %>%
-#  select(-collect_time)
-
-# a.) create a matching table for all iterations of collect_date, collect_time, and location
-#match_df_collect_time <- sgs21 %>%
-#  filter(analyte == "Total Phosphorus") %>%
-#  distinct(monitoring_location_name,sample_condition, collect_date, collect_time) 
-#  mutate(collect_time = "") %>%
-#  filter(!is.na(monitoring_location_name))
-
-# write.csv(match_df_collect_time,"other/input/AQWMS/match_df_collect_time_spring_als21.csv", row.names = F)
-
-
-# b.) left_join this df back to the main dataframe
-#z <- left_join(sgs21,match_df_collect_time, by = c("collect_date","monitoring_location_id"))
-
-
-# remove matching table
-#rm(match_df_collect_time)
 
 ```
 
@@ -508,12 +480,19 @@ swwtp_spring21 <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SWW
 ## fix site naming and terminology
 
 # move info about duplicate sample and/or sample blank status into separate column
+  # sample type abbreviations
+  mutate(sample_type = case_when(
+    grepl("BLANK",sample_location_rm) ~ "MB", # method blank
+    grepl("POSITIVE",sample_location_rm) ~ "LCS")) %>% # laboratory control sample
+ # assign all other samples as "PS" (project sample)
+  mutate_at(vars(sample_type),~replace_na(.,"PS")) %>%
+
+  # field dup designation
   mutate(sample_condition = case_when(
-    grepl("BLANK",sample_location_rm) ~ "Lab Blank",
-    grepl("DUP",sample_location_rm) ~ "DUP",
-    grepl("POSITIVE",sample_location_rm) ~ "Positive Control")) %>%
+    grepl("DUP",sample_location_rm) ~ "Field Duplicate")) %>%
   # remove "BLANK", and "POSITIVE designation from sample_location column
   mutate(sample_location_rm = (str_replace(sample_location_rm, "BLANK|POSITIVE", ""))) 
+
 
 # remove "DUP" from site name column and trim white spaces in site name column
 swwtp_spring21 %<>%
@@ -579,11 +558,11 @@ swwtp_spring21 %<>%
   transform(lab_sample = as.character(lab_sample),
             result = as.double(result)) %>%
   
-  # create "sample_type" column
-  mutate(sample_type = case_when(
-    sample_condition == "Lab Blank" ~ "MB", # method blank
-    sample_condition == "Positive Control" ~ "LCS" # laboratory control sample
-  ))
+  # apply correction to the one "TNTC" result (Too Numerous To Count), since we can't have characters and integers in same column
+  mutate(note = case_when(
+    lab_sample == "30" ~ paste("Lab analysis volume = 0.5 mL, result = TNTC"),
+    TRUE ~ note))
+
 
 
 # segregate lab results from field results, and write lab qa/qc results to external csv
@@ -601,6 +580,30 @@ dat <- bind_rows(dat,swwtp_spring21) %>%
   select(-location)
 
 rm(swwtp_spring21)
+
+
+
+
+
+
+
+
+
+
+
+
+# working here (below) 3/28/22 -- need to apply distinction to field vs lab duplicates. see explanation at line 255 !!!
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1115,15 +1118,41 @@ total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2
 
 2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
 
-3.  Are site names, dates, and times correct and as expected? ***Yes*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
+3.  Are site names, dates, and times correct and as expected? ***Yes, after post-season correction*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
 
 ```{r, echo = F}
 
 # we have identified errors in site name / sample type transcription
-# manually create transmission chain of site/sample names for spring 2021
-# see excel document at other/input/2021_wqx_data/miscellaenous
+# to address this, we will manually create a transmission chain of site/sample names for spring 2021
+# see excel document at other/input/2021_wqx_data/miscellaenous/2021_sample_name_rectification.xlsx
 
-# go though and document coc to decide what data we can defend inclusion/exclusion of
+# task: go though and document chain of custody to decide what data we can defend inclusion/exclusion of
+
+## 2021 SGS site/sample names
+# read in 2021 sgs data
+spring_batch_sgs21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_sgs_batch_info.csv")
+summer_batch_sgs21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_sgs_batch_info.csv")
+
+# clean up and retain only useful columns
+sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
+  clean_names() %>%
+  filter(project_id == "KenaiRiver Wtr Qlty Monitoring") %>%
+  distinct(sample_id)
+write.csv(sgs21,"other/temp.csv")
+
+## 2021 ALS site/sample names
+#### read in spring 2021 results from ALS 
+spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv") %>%
+    clean_names() 
+summer_als21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_als_batch_info.csv") %>%
+    clean_names()
+
+# bind spring and summer 2021 ALS
+als21 <- bind_rows(spring_als21,summer_als21) %>%
+  distinct(sample)
+
+
+
 ```
 
 
@@ -1198,6 +1227,25 @@ rm(spring21_planned,summer21_planned)
 z <- dat %>%
   clean_names() %>%
   filter(activity_type != "Field Msr/Obs") %>%
+  distinct(activity_type,result_analytical_method_id, activity_start_date, monitoring_location_id)
+  
+  
+# for unclear reasons,  DUP status is incorrectly assigned to the following:
+# KR RM 22 SOC 2021-05-11 200.7
+# KR RM 1.5 2021-07-27 200.7
+# KR RM 23 2021-05-11 200.7
+# KR RM 70 2021-07-27 200.7
+
+# likely explanation -- als ran these as LAB duplicates ... was this even requested or part of the qapp????? yeesh.
+# steps:
+# 1.) ensure data is transferred from EDD to final export (currently is not, eg. average = "NA", rpd is blank)
+# 2.) assign these data as LAB replicates. wtf.
+
+
+  
+# 3/28/22 - looked back in earlier code chunks to find why  
+
+  
   # assign each observation as dup or blank
   mutate(sample_type = case_when(
     grepl("DUP",activity_id, ignore.case = TRUE) ~ "FIELD DUPLICATE",
@@ -1216,7 +1264,7 @@ z <- dat %>%
 write.csv(z,"other/output/temp.csv")
 
 
-
+# clarify issue here
 
 
 
