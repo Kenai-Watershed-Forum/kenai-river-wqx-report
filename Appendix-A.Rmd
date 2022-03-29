@@ -429,15 +429,17 @@ rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 
 # segregate laboratory QA/QC data from field data. These data will be evaluated at a later step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
 sgs21_als21_qaqc_dat <- dat %>%
-    # retain only results not from field sampling program
-   filter(!sample_type %in% c("PS","SMPL"))
+    # retain only results not from field sampling program (project samples and trip blanks)
+    # also filter out hydrocarbon surrogate results ("surr"). Surrogate standards are compounds spiked into all samples, blanks, Laboratory Control Samples, and matrix spikes to monitor the efficacy of sample extraction, chromatographic, and calibration systems. They do not represent environmental observations.
+   filter(!sample_type %in% c("PS","SMPL","TB") | 
+            grepl("(surr)",analyte))
 write.csv(sgs21_als21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data/sgs21_als21_qaqc_dat.csv")
 
 
 # retain only non-field sample results for AQWMS export
 dat %<>%
-   filter(sample_type %in% c("PS","SMPL"))
-
+  filter(sample_type %in% c("PS","SMPL","TB")) %>%
+  filter(!grepl("(surr)",analyte))
 
 ```
 
@@ -583,30 +585,6 @@ rm(swwtp_spring21)
 
 
 
-
-
-
-
-
-
-
-
-
-# working here (below) 3/28/22 -- need to apply distinction to field vs lab duplicates. see explanation at line 255 !!!
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 ########################### Part B: Taurianen FC Data Read In (Summer 2021) ##############################################
 
 
@@ -617,7 +595,7 @@ taur_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taur
   
 ## move info about duplicate sample and/or sample blank status into separate column
   mutate(sample_condition = case_when(
-    grepl("DUP",sample_location) ~ "DUP")) %>%
+    grepl("DUP",sample_location) ~ "Field Duplicate")) %>%
   # remove "DUP" designation from sample_location column
   mutate(sample_location = (str_replace(sample_location, "_DUP", ""))) %>%
   # trim white spaces in site name column
@@ -641,6 +619,7 @@ taur_summer21 <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/Taur
   rename(sample = sample_location,
          collect_time = time_sampled)
 
+# NOTE: for Taurianan QA/QC practices, see email from from Taurianen at "other/documents/references/Taurianen QA Technique (Email march 2022).docx" (folder in this project repo)
   
 
 ## fix site naming and terminology
@@ -729,6 +708,7 @@ xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS 
 # SWWTP Spring 2021 TSS data
 ## Reformat TSS data to match AQWMS template
 
+
 # read in
 swwtp_tss_spring21 <- read_excel('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS MONITORING 05-11-21.xlsx', skip = 1, sheet = "Updated_Formatting") %>%
   clean_names() %>%
@@ -749,8 +729,6 @@ swwtp_tss21 <- bind_rows(swwtp_tss_spring21,swwtp_tss_summer21) %>%
 rm(swwtp_tss_spring21,swwtp_tss_summer21)
 
 # prepare and format to match larger dataset
-#swwtp_tss21 %<>%
- 
 
  # miscellaneous
 
@@ -762,7 +740,7 @@ swwtp_tss21 %<>%
 
   # move info about duplicate sample and/or sample blank status into separate column
   mutate(sample_condition = case_when(
-    grepl("DUP",sample_location) ~ "DUP")) %>%
+    grepl("DUP",sample_location) ~ "Field Duplicate")) %>%
   # remove "DUP" designation from locations column
   mutate(sample_location = str_replace(sample_location, "_DUP", "")) %>%
   # replace "O" with zeros in location column
@@ -830,7 +808,9 @@ swwtp_tss21 <- left_join(swwtp_tss21,swwtp_tss_sitenames)  %>%
   rename(sample = sample_location)
 
 
-######## 3/21/2022 --> no qa/qc results from SWWTP TSS on record yet. contact by email to see whats available. looking for labd duplicate and/or external qc check standard (pg 34 of QAPP)
+######## 3/21/2022 --> no qa/qc results from SWWTP TSS on record yet. contact by email to see whats available. looking for lab duplicate and/or external qc check standard (pg 34 of QAPP)
+
+# no response as of 3/29/22. need to call to ensure practice/records are in place by spring 2022
 
 # segregate lab results from field results, and write lab qa/qc results to external csv
 #swwtp_tss21_qaqc_dat <- swwtp_tss21 %>%
@@ -946,6 +926,26 @@ dat %<>%
 
 
 
+
+########### f.) "Activity ID" code shortening ######################
+
+# The Activity ID column consists of (`Monitoring Location ID`,"-",collect_date,"-",analyte,"-",sample_condition). This field is permitted to be no longer than 55 characters. With full names of analytes included, the entries sometimes exceed 55 characters. To address this, we will use analyte abbreviations. For single elements, we will use their periodic table abbreviation. For other analytes (e.g. nutrients, volatiles), we will consult what abbreviations already exist in the Water Quality Exchange repository
+
+# export list of unique analytes from 2021 data
+write.csv(data.frame(unique(dat$analyte)),"other/input/AQWMS/analytes_list.csv", row.names = F)
+
+# manually...
+
+# re-import edited list of analyte abbreviation names
+
+
+```
+
+
+
+```{r}
+############ XX.) prepare final format ###############################
+
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
 dat %<>%
@@ -968,8 +968,9 @@ dat %<>%
     `Activity Longitude` = longitude, 
     `Activity Source Map Scale` = "",
     `Activity Type` = case_when(
-      sample_condition == "DUP" ~ "Quality Control Field Replicate Msr/Obs",
+      sample_condition == "Field Duplicate" ~ "Quality Control Field Replicate Msr/Obs",
       sample_condition == "Blank" ~ "Quality Control Sample-Trip Blank",
+      sample_type == "TB" ~ "Quality Control Sample-Field Blank",
       TRUE ~ "Field Msr/Obs"),
     # All samples are surface grab samples. Depths are assigned across the board here as 6 inches (~15 cm) 
     `Activity Depth/Height Measure` = 15,
@@ -1357,6 +1358,7 @@ z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
   #filter(CharacteristicName == "Fecal Coliform")
  # select(ActivityStartDate,CharacteristicName) %>%
   clean_names() %>%
+  select()
   transform(activity_start_date = ymd(activity_start_date)) %>%
   group_by(characteristic_name) %>%
   summarise(min_date = min(activity_start_date),
