@@ -416,18 +416,26 @@ dat %<>%
 rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 
 
+```
 
+
+```{r}
 ########################## Miscellaneous Steps #########################################
 
 
-# move "DUP1" in sample_type column over to sample_condition as "DUP"
-#dat %<>%
-#  mutate(sample_condition = case_when(
-#    sample_type == "DUP1" ~ "DUP",
-#    sample_type != "DUP1" ~ sample_condition))
+########### Address Non-Detect values #########################
+
+# Non-detect values should be left blank. A non-detect does not necessarily mean there was a zero observation of an analyte in a sample, it could be just be present at a level lower than the method detection level (lower than what the lab equipment can detect). Instead of 0, we’ll leave it blank. The Practical Quantitation Limit (or Limit of Quantitation) is presented alongside the result. When DEC evaluates a waterbody, they’ll use ½ the PQL as a stand-in for a non-detect. See explanatory document at other/documents/references/SGS DL, LOD, LOQ Interpretation.pdf for more details.
+
+# modify non-detect values from "0" to "NA" if resultflag = U or ND
+dat %<>%
+  mutate(result1 = na_if(result,0)) %>%
+  select(-result) %>%
+  rename(result = result1)
 
 
-# segregate laboratory QA/QC data from field data. These data will be evaluated at a later step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
+###### Segregate laboratory QA/QC data from field data ########
+# These data will be evaluated at a later step. See excel file "other/input/AQWMS/sample_type_abbreviations_manual_edit.xlsx" for sample_type naming schema
 sgs21_als21_qaqc_dat <- dat %>%
     # retain only results not from field sampling program (project samples and trip blanks)
     # also filter out hydrocarbon surrogate results ("surr"). Surrogate standards are compounds spiked into all samples, blanks, Laboratory Control Samples, and matrix spikes to monitor the efficacy of sample extraction, chromatographic, and calibration systems. They do not represent environmental observations.
@@ -530,7 +538,6 @@ swwtp_spring21 %<>%
          sample_date = mdy(spring21_sample_date))
   
 
-
 ## rename existing column names and create new ones to match sgs21 data format at end of prior code chunk
 swwtp_spring21 %<>% 
   rename(lab_sample = dish_number,
@@ -565,6 +572,23 @@ swwtp_spring21 %<>%
     lab_sample == "30" ~ paste("Lab analysis volume = 0.5 mL, result = TNTC"),
     TRUE ~ note))
 
+
+########### Address Non-Detect values #########################
+
+# Non-detect values should be left blank. A non-detect does not necessarily mean there was a zero observation of an analyte in a sample, it could be just be present at a level lower than the method detection level (lower than what the lab equipment can detect). Instead of 0, we’ll leave it blank. The Practical Quantitation Limit (or Limit of Quantitation) is presented alongside the result. When DEC evaluates a waterbody, they’ll use ½ the PQL as a stand-in for a non-detect. See explanatory document at other/documents/references/SGS DL, LOD, LOQ Interpretation.pdf for more details.
+
+# Assign resultflag column. Use "=" if result > 1 and "U" if result < 1. See pg 17 of 2020 QAPP at "other/documents/QAPP/QAPP-2020-KenaiRiverWatershed_ZnCu.pdf"
+
+swwtp_spring21 %<>%
+  mutate(resultflag = case_when(
+    result < 1 ~ "U",
+    TRUE ~ "="))
+
+# modify non-detect values from "0" to "NA" if resultflag = U or ND
+swwtp_spring21 %<>%
+  mutate(result1 = na_if(result,0)) %>%
+  select(-result) %>%
+  rename(result = result1)
 
 
 # segregate lab results from field results, and write lab qa/qc results to external csv
@@ -663,6 +687,23 @@ taur_summer21 %<>%  mutate(sample_type = case_when(
     sample_condition == "Positive Control" ~ "LCS", # laboratory control sample
     TRUE ~ "PS"
     ))
+
+########### Address Non-Detect values #########################
+
+# Non-detect values should be left blank. A non-detect does not necessarily mean there was a zero observation of an analyte in a sample, it could be just be present at a level lower than the method detection level (lower than what the lab equipment can detect). Instead of 0, we’ll leave it blank. The Practical Quantitation Limit (or Limit of Quantitation) is presented alongside the result. When DEC evaluates a waterbody, they’ll use ½ the PQL as a stand-in for a non-detect. See explanatory document at other/documents/references/SGS DL, LOD, LOQ Interpretation.pdf for more details.
+
+# Assign resultflag column. Use "=" if result > 1 and "U" if result < 1. See pg 17 of 2020 QAPP at "other/documents/QAPP/QAPP-2020-KenaiRiverWatershed_ZnCu.pdf"
+
+taur_summer21 %<>%
+  mutate(resultflag = case_when(
+    result < 1 ~ "U",
+    TRUE ~ "="))
+
+# modify non-detect values from "0" to "NA" if resultflag = U or ND
+taur_summer21 %<>%
+  mutate(result1 = na_if(result,0)) %>%
+  select(-result) %>%
+  rename(result = result1)
 
 
 
@@ -776,6 +817,8 @@ swwtp_tss21 %<>%
          analyte = "Total suspended solids",
          # loq = reporting limit
          loq = 1.0,
+         # lod = sensitivity, or method detection limit
+         lod = 0.31,
          lab_name = "Soldotna Wastewater Treatment Plant, Soldotna, Alaska")
 
   
@@ -787,8 +830,6 @@ swwtp_tss21 %<>%
     TRUE ~ "PS"
     ))
 
-
-  
 # get site names consistent with AWQMS format
 swwtp_tss_sitenames <- data.frame(unique(swwtp_tss21$sample_location))
 
@@ -806,6 +847,27 @@ swwtp_tss_sitenames <- read_excel("other/input/AQWMS/swwtp_tss_site_names_matchi
 swwtp_tss21 <- left_join(swwtp_tss21,swwtp_tss_sitenames)  %>%
   clean_names() %>%
   rename(sample = sample_location)
+
+
+########### Address Non-Detect values #########################
+
+# Non-detect values should be left blank. A non-detect does not necessarily mean there was a zero observation of an analyte in a sample, it could be just be present at a level lower than the method detection level (lower than what the lab equipment can detect). Instead of 0, we’ll leave it blank. The Practical Quantitation Limit (or Limit of Quantitation) is presented alongside the result. When DEC evaluates a waterbody, they’ll use ½ the PQL as a stand-in for a non-detect. See explanatory document at other/documents/references/SGS DL, LOD, LOQ Interpretation.pdf for more details.
+
+# Assign resultflag column. Use "=" if result > 1 and "U" if result < 1. See pg 17 of 2020 QAPP at "other/documents/QAPP/QAPP-2020-KenaiRiverWatershed_ZnCu.pdf"
+swwtp_tss21 %<>%
+  mutate(resultflag = case_when(
+    result < 1 & result > 0.31 ~ "J",
+    result < 0.31 ~ "U",
+    TRUE ~ "="))
+
+# modify non-detect values from "0" to "NA" if resultflag = U or ND
+swwtp_tss21 %<>%
+  mutate(result1 = na_if(result,0)) %>%
+  select(-result) %>%
+  rename(result = result1)
+
+# in future scripts need to ensure that non-detect "0" results (resultflag = "U") are shown as "NA" rather than zero.
+
 
 
 ######## 3/21/2022 --> no qa/qc results from SWWTP TSS on record yet. contact by email to see whats available. looking for lab duplicate and/or external qc check standard (pg 34 of QAPP)
@@ -886,7 +948,7 @@ result_detection_condition <- read_excel("other/input/AQWMS/AQWMS_template_match
 
 dat %<>%
   mutate(result_detection_condition = case_when(
-    resultflag == "U" ~ "Not Detected",
+    resultflag == "U" | resultflag == "ND" ~ "Not Detected",
     resultflag == "J" ~ "Present Below Quantification Limit"))
 
 
@@ -925,18 +987,31 @@ dat %<>%
   ))
 
 
-
-
 ########### f.) "Activity ID" code shortening ######################
 
-# The Activity ID column consists of (`Monitoring Location ID`,"-",collect_date,"-",analyte,"-",sample_condition). This field is permitted to be no longer than 55 characters. With full names of analytes included, the entries sometimes exceed 55 characters. To address this, we will use analyte abbreviations. For single elements, we will use their periodic table abbreviation. For other analytes (e.g. nutrients, volatiles), we will consult what abbreviations already exist in the Water Quality Exchange repository
+# The Activity ID column consists of concatenating the columns (`Monitoring Location ID`,"-",collect_date,"-",analyte,"-", sample_condition). This field is permitted to be no longer than 55 characters. With full names of analytes included, the entries sometimes exceed 55 characters. 
 
+# To address this, we will do two things: 
+## a.) use analyte abbreviations: for single elements, we will use their periodic table abbreviation. TBD for other analytes.
+## b.) use abbreviations for sample_condition (designations of field blank or field dup)
+
+## a.) analyte abbreviations
 # export list of unique analytes from 2021 data
 write.csv(data.frame(unique(dat$analyte)),"other/input/AQWMS/analytes_list.csv", row.names = F)
 
-# manually...
+# manually assign abbreviations for each analyte in the sister file "analytes_list_manual_edit.csv"
 
-# re-import edited list of analyte abbreviation names
+# re-import edited list of analyte abbreviation names, then append to dataframe. Use in later step when creating Activity IDs.
+analyte_abbrev <- read.csv("other/input/AQWMS/analytes_list_manual_edit.csv")
+colnames(analyte_abbrev) <- c("analyte","analyte_abbreviation")
+dat %<>%
+  left_join(analyte_abbrev)
+
+## b.) sample_condition abbreviations
+dat %<>%
+  mutate(sample_condition_abbrv = case_when(
+    sample_condition == "Field Duplicate" ~ "DUP",
+    sample_condition == "Trip Blank" ~ "Blank"))
 
 
 ```
@@ -958,8 +1033,8 @@ dat %<>%
     `Activity Media Subdivision Name` = "Surface Water",
     # create activity ID name conditionally if condition(s) present
     `Activity ID` = case_when(
-      is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte),
-      !is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte,"-",sample_condition)),
+      is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte_abbreviation),
+      !is.na(sample_condition) ~ paste0(`Monitoring Location ID`,"-",collect_date,"-",analyte_abbreviation,"-",sample_condition_abbrv)),
     `Activity Start Date` = collect_date,
     `Activity Start Time` = collect_time,
     `Activity End Date` = "",
@@ -1040,12 +1115,6 @@ write.csv(dat,"other/output/aqwms_formatted_results/2021_kwf_baseline_results_aq
 
 
 
-
-
-#### to do
-
-# figure out whats the deal with BTEX surrogate ("surr") results
-
 ```
 
 </details>
@@ -1069,7 +1138,7 @@ xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results
 
 ### Data Evaluation
 
-Prior to submission to ADEC, all water quality data must address a series of data evaluation questions in order to evaluate how quality assurance / quality check (QA/QC) processes are instituted. The draft Data Evaluation Checklist Template (available below) outlines these questions:
+Prior to submission to ADEC, all water quality data must address a series of data evaluation questions in order to evaluate how quality assurance / quality check (QA/QC) processes are instituted. The draft Data Evaluation Checklist Template (available for download below) outlines these questions:
 
 ```{r, echo = F}
 xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Template_20220201.docx', text = "Download Draft ADEC Draft Data Evaluation Checklist Template")
@@ -1096,9 +1165,6 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 
 ### table of samples collected
 total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
-  clean_names() %>%
-  # unique location, date, parameter
-  distinct(monitoring_location_id, activity_start_date, characteristic_name, result_value) %>%
   count() %>%
   as.integer()
 
@@ -1113,51 +1179,11 @@ total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2
 
 
 
-
-
 1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***Yes. Refer to Individual Answers Below***
 
 2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
 
 3.  Are site names, dates, and times correct and as expected? ***Yes, after post-season correction*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
-
-```{r, echo = F}
-
-# we have identified errors in site name / sample type transcription
-# to address this, we will manually create a transmission chain of site/sample names for spring 2021
-# see excel document at other/input/2021_wqx_data/miscellaenous/2021_sample_name_rectification.xlsx
-
-# task: go though and document chain of custody to decide what data we can defend inclusion/exclusion of
-
-## 2021 SGS site/sample names
-# read in 2021 sgs data
-spring_batch_sgs21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_sgs_batch_info.csv")
-summer_batch_sgs21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_sgs_batch_info.csv")
-
-# clean up and retain only useful columns
-sgs21 <- bind_rows(spring_batch_sgs21,summer_batch_sgs21) %>%
-  clean_names() %>%
-  filter(project_id == "KenaiRiver Wtr Qlty Monitoring") %>%
-  distinct(sample_id)
-write.csv(sgs21,"other/temp.csv")
-
-## 2021 ALS site/sample names
-#### read in spring 2021 results from ALS 
-spring_als21 <- read.csv("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/spring_2021_als_batch_info.csv") %>%
-    clean_names() 
-summer_als21 <- read.csv("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/summer_2021_als_batch_info.csv") %>%
-    clean_names()
-
-# bind spring and summer 2021 ALS
-als21 <- bind_rows(spring_als21,summer_als21) %>%
-  distinct(sample)
-
-
-
-```
-
-
-
 
 4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021.
 
@@ -1173,7 +1199,7 @@ Data evaluation is currently in progress and the values below are current as of 
     -   Project goal: ***60%***
 
 
-5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***No***
+5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***Yes***
 
 ```{r, echo = F}
 # How many field blanks, field duplicates, and other QC samples were planned vs. collected?
@@ -1224,11 +1250,13 @@ rm(spring21_planned,summer21_planned)
 
 
 ################ B.) Count ACTUALLY COLLECTED 2021 field blanks/dups #################
+# note bottles vs test. total P and total NO3/NO2 from same bottle
 
 z <- dat %>%
   clean_names() %>%
   filter(activity_type != "Field Msr/Obs") %>%
-  distinct(activity_type,result_analytical_method_id, activity_start_date, monitoring_location_id)
+  distinct(activity_type,result_analytical_method_id, activity_start_date, monitoring_location_id) %>%
+  count(activity_type)
   
   
 # for unclear reasons,  DUP status is incorrectly assigned to the following:
@@ -1236,6 +1264,11 @@ z <- dat %>%
 # KR RM 1.5 2021-07-27 200.7
 # KR RM 23 2021-05-11 200.7
 # KR RM 70 2021-07-27 200.7
+
+
+# i think this (above) is fixed now
+# planned vs actual still not quite matching up. cause tbd.
+
 
 # likely explanation -- als ran these as LAB duplicates ... was this even requested or part of the qapp????? yeesh.
 # steps:
@@ -1245,24 +1278,24 @@ z <- dat %>%
 
   
 # 3/28/22 - looked back in earlier code chunks to find why  
-
+# used this code to disocovere thru trial and error that ALS ran lab dups, different than field dups
   
   # assign each observation as dup or blank
-  mutate(sample_type = case_when(
-    grepl("DUP",activity_id, ignore.case = TRUE) ~ "FIELD DUPLICATE",
-    grepl("blank",activity_id, ignore.case = TRUE) ~ "FIELD BLANK")) %>%
-  select(activity_type,sample_type,result_analytical_method_id, activity_start_date, monitoring_location_id) %>%
-  distinct() %>%
+#  mutate(sample_type = case_when(
+ #   grepl("DUP",activity_id, ignore.case = TRUE) ~ "FIELD DUPLICATE",
+  #  grepl("blank",activity_id, ignore.case = TRUE) ~ "FIELD BLANK")) %>%
+#  select(activity_type,sample_type,result_analytical_method_id, activity_start_date, monitoring_location_id) %>%
+#  distinct() %>%
   # rearrange dataframe so that both phosphorus and nitrate tests are from same bottle
-  filter(result_analytical_method_id != "4500-P-E") %>%
-  rename(result_analytical_method_id_1 = result_analytical_method_id) %>%
-  mutate(result_analytical_method_id_2 = case_when(
-    result_analytical_method_id_1 == "4500-NO3(F)" ~ "4500-P-E"
-  )) %>%
-  select(activity_type,sample_type,activity_start_date,monitoring_location_id,result_analytical_method_id_1,result_analytical_method_id_2) %>%
-  arrange(monitoring_location_id,activity_start_date)
+ # filter(result_analytical_method_id != "4500-P-E") %>%
+ # rename(result_analytical_method_id_1 = result_analytical_method_id) %>%
+#  mutate(result_analytical_method_id_2 = case_when(
+ #   result_analytical_method_id_1 == "4500-NO3(F)" ~ "4500-P-E"
+ # )) %>%
+#  select(activity_type,sample_type,activity_start_date,monitoring_location_id,result_analytical_method_id_1,result_analytical_method_id_2) %>%
+ # arrange(monitoring_location_id,activity_start_date)
 
-write.csv(z,"other/output/temp.csv")
+#write.csv(z,"other/output/temp.csv")
 
 
 # clarify issue here
