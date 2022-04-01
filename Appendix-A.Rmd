@@ -1152,28 +1152,87 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 
 # This code chunk will prepare values to be used in addressing the data review questions below. 
 
-# The code will be executed here rather than in individual chunks above each individual question, because some of the questions are not sequentially independent. 
-
-# That is to say, values from multiple questions are needed to answer single questions, sometimes from prior and sometimes from after a particular question. For example in question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #4.
+# The code will be executed here rather than in individual chunks above each individual question, because some of the questions are not sequentially independent. (That is to say, values from multiple questions are needed to answer single questions, sometimes from prior and sometimes from after a particular question. For example in question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #4).
 
 # 1.: No calculation needed.
 # 2.: No calculation needed.
 # 3.: No calculation needed.
 # 4.: Calculations needed
 
-## 4.1: Completeness Measure A: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
+## 4.1: Completeness Measure A: "the primary number of samples collected divided by the useable number of samples submitted to ADEC with a goal of 85% completeness."
 
-### table of samples collected
+## 4.1: Completeness Measure B: "the planned number of samples divided by the useable samples with a goal of 60%."
+
+### calculate values needed for completeness
+# create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
+
+### First: get number of samples (results) actually collected
 total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
+  clean_names() %>%
+  group_by(result_analytical_method_id) %>%
   count() %>%
-  as.integer()
+  rename(actual_result = n)
 
+### number of samples finalized and submitted to DEC
+# total_samples_usable_2021 <- get value once all QA/QC processes complete
 
-### table of samples finalized and submitted to DEC
+### number of PLANNED results
 
+#### use kit request data to count "required" (planned) samples
 
+## read in SPRING 2021 planned samples
+spring21_planned <- read_excel("other/input/2021_wqx_data/spring_2021_wqx_data/SGS/KRBWQM_SGS_bottle_order_Spring_2021.xlsx", sheet = "bottles_analyses_spring_2021") %>%
+  mutate(activity_start_date = spring21_sample_date)
 
-## 4.2: Completeness Measure B: use table for kit request to get total number of planned samples. compare this table to final set of values that hold up against qa/qc process
+## read in SUMMER 2021 planned samples
+summer21_planned <- read_excel("other/input/2021_wqx_data/summer_2021_wqx_data/SGS/KRBWQM_SGS_bottle_order_Summer_2021.xlsx", sheet = "bottles_analyses_summer_2021") %>%
+  mutate(activity_start_date = summer21_sample_date)
+
+## combine spring and summer 2021
+planned_samples_2021 <- bind_rows(spring21_planned,summer21_planned) %>%
+  
+## prepare and summarise table samples collected and tests performed
+  clean_names() %>%
+  filter(item == "Bottle") %>%
+  select(site,container_size,quantity,preservative,analysis_1,analysis_2,activity_start_date) %>%
+  fill(site, .direction = "down") %>%
+  filter(site != "Spare Kit") %>%
+  mutate(sample_type = case_when(
+    grepl("DUPLICATE",site, ignore.case = TRUE) ~ "FIELD DUPLICATE",
+    grepl("blank",analysis_1, ignore.case = TRUE) ~ "FIELD BLANK"
+  )) %>%
+  pivot_longer(values_to = "analysis", cols = c("analysis_1","analysis_2")) %>%
+  filter(!is.na(analysis)) %>%
+  
+  # consolidate BTEX analysis types ("blank" analysis is same as regular)
+  mutate(analysis = str_replace(analysis,"624 - BTEX trip blank","624 - BTEX")) %>%
+  
+  # rename analysis types to match between planned and actual 
+  mutate(analysis = case_when(
+    analysis == "SM4500-NO3E - Nitrogen (Nitrate+Nitrite)" ~ "SM4500-NO3E",
+    analysis == "SM4500-PE - Total Phosphorus" ~ "4500-P-E",
+    analysis == "200.7 - Total Metals" ~ "200.7",
+    analysis == "200.8 - Dissolved Metals" ~ "200.8",
+    analysis == "1 liter Total Suspended Solids" ~ "2540-D",
+    analysis == "Fecal Coliform" ~ "9222D",
+    analysis == "624 - BTEX" ~ "8260D")) %>%
+  
+  # assign number of expected results per analysis
+  mutate(expected_results = case_when(
+    analysis == "SM4500-NO3E - Nitrogen (Nitrate+Nitrite)" ~ 1,
+    analysis == "SM4500-PE - Total Phosphorus" ~ 1,
+    analysis == "200.7 - Total Metals" ~ 3, # i think27 in 
+    analysis == "200.8 - Dissolved Metals" ~ 6, # custom short list; though lab accidentally ran full list of 27 analytes in 2021
+    analysis == "1 liter Total Suspended Solids" ~ 1,
+    analysis == "Fecal Coliform" ~ 1,
+    analysis == "624 - BTEX" ~ 6)) %>%
+  group_by(analysis,expected_results) %>%
+  summarise(expected_ct = sum(expected_results)) %>%
+  select(-expected_results) %>%
+  rename(expected_result = expected_ct)
+
+# join planned vs expected tables
+
 ```
 
 
