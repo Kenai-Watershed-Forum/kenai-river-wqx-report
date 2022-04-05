@@ -449,6 +449,8 @@ dat %<>%
   filter(sample_type %in% c("PS","SMPL","TB")) %>%
   filter(!grepl("(surr)",analyte))
 
+rm(sgs21_als21_qaqc_dat)
+
 ```
 
 </details>
@@ -717,7 +719,7 @@ write.csv(taur_summer21_qaqc_dat, "other/output/lab_qaqc_data/2021_lab_qaqc_data
 dat <- bind_rows(dat,taur_summer21)
   
 
-rm(taur_summer21,taur_summer21_sites,taur_summer21_qaqc_dat)
+rm(taur_summer21,taur_summer21_sites,taur_summer21_qaqc_dat,swwtp_spring21_qaqc_dat)
 
 ```
 
@@ -1014,12 +1016,9 @@ dat %<>%
     sample_condition == "Trip Blank" ~ "Blank"))
 
 
-```
 
 
-
-```{r}
-############ XX.) prepare final format ###############################
+############ g.) prepare final format ###############################
 
 # create column structure from example in AQWMS template. Use existing input from SGS results if applicable, specify value from "Permitted Values" tab if SGS input not applicable or not yet specified
 
@@ -1072,14 +1071,10 @@ dat %<>%
     `Sample Collection Method ID` = "",
     `Equipment ID` = "Water Bottle",
     `Result Detection Condition` = result_detection_condition,
-   
-   # potentially a complex process here 3/2/2022 - sent email to DEC to clarify how to deal w/ duplicate column names
-   # reply: renaming as 1 and 2 OK for now
-   
     `Result Detection Limit Type 1` = "Limit of Quantitation",
     `Result Detection Limit Value 1` = loq,
     `Result Detection Limit Unit 1` = units,
-   # note: lod = "limit of detecion"; equivalent to "method detection level"
+   # note: lod = "limit of detection"; equivalent to "method detection level"
     `Result Detection Limit Type 2` = "Method Detection Level",
     `Result Detection Limit Value 2` = lod,
     `Result Detection Limit Unit 2` = units,
@@ -1111,8 +1106,6 @@ aqwms_colnames <- read_excel("other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx", s
  
 # export final formatted AQWMS results to external csv
 write.csv(dat,"other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv",row.names = F)
-
-
 
 
 ```
@@ -1148,7 +1141,7 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 
 ##### Overall Project Success
 
-```{r, echo = F}
+```{r, echo = F, message = F}
 
 # This code chunk will prepare values to be used in addressing the data review questions below. 
 
@@ -1170,12 +1163,14 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 # general approach: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
 
 ### First: get number of samples (results) actually collected
-total_samples_collected_2021 <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
+total_samples_collected_2021_summary <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
   clean_names() %>%
-  group_by(result_analytical_method_id,activity_start_date) %>%
+  group_by(result_analytical_method_id,activity_start_date,activity_type) %>%
   count() %>%
   rename(actual_results_n = n) %>%
-  transform(activity_start_date = ymd(activity_start_date))
+  transform(activity_start_date = ymd(activity_start_date)) 
+
+# need total samples collected summary too????
 
 ### Second: number of samples finalized and submitted to DEC
 #### total_samples_usable_2021 <- get value once all QA/QC processes complete
@@ -1229,11 +1224,19 @@ planned_samples_2021 <- bind_rows(spring21_planned,summer21_planned) %>%
     analysis == "200.8" ~ 6, # custom short list; though lab accidentally ran full list of 27 analytes in 2021
     analysis == "2540-D" ~ 1,
     analysis == "9222D" ~ 1,
-    analysis == "8260D" ~ 6)) 
+    analysis == "8260D" ~ 6)) %>%
+  mutate(activity_type = case_when(
+    sample_type == "FIELD DUPLICATE" ~ "Quality Control Field Replicate Msr/Obs",
+    sample_type == "FIELD BLANK" ~ "Quality Control Sample-Field Blank",
+    TRUE ~ "Field Msr/Obs")) %>%
+  select(-sample_type)
+
+# clear interim steps
+rm(spring21_planned,summer21_planned)
 
 # create summary table of planned samples
 planned_samples_2021_summary <- planned_samples_2021 %>%
-  group_by(analysis,expected_results,activity_start_date,sample_type) %>%
+  group_by(analysis,expected_results,activity_start_date,activity_type) %>%
   summarise(expected_ct = sum(expected_results)) %>%
   ungroup() %>%
   select(-expected_results) %>%
@@ -1241,7 +1244,6 @@ planned_samples_2021_summary <- planned_samples_2021 %>%
          result_analytical_method_id = analysis) %>%
   transform(activity_start_date = mdy(activity_start_date),
             expected_results_n = as.numeric(expected_results_n))
-
 
 
 # create table of planned vs actual analyses
@@ -1252,6 +1254,8 @@ planned_actual_analyses_2021 <- left_join(planned_samples_2021_summary,total_sam
 # Cause 1: The Spring 2021 Chain of Custody from KWF to SGS was completed erroneously. The COC specified for 200.8 analyses to be complete for all sites (when they should have stopped upstream of Morgan's Landing RM31), and it also specified for 200.7 analyses to stop upstream of Morgan's Landing (when they should have been performed for all sites in the project).
 
 # Cause 2: For Summer 2021, the SGS performed the 200.8 analyses for all 27 analytes available for the method; instead of just the smaller subset of analytes. (E.g., KWF received extra data for free.)
+
+# once data that does not pass QC muster is flagged and removed, we will append an additional column
 
 ```
 
@@ -1276,9 +1280,9 @@ Data evaluation is currently in progress and the values below are current as of 
     -   Project goal: ***60%***
 
 
-5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***No; one analysis not performed in Spring 2021***
+5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***Yes, with one exception, see below***
 
-```{r planned-dups-blanks, echo = F}
+```{r , echo = F, message = F, warning = F}
 # How many field blanks, field duplicates, and other QC samples were planned vs. collected?
 
 ################ A.) Count PLANNED 2021 field blanks/dups #################
@@ -1289,13 +1293,13 @@ Data evaluation is currently in progress and the values below are current as of 
 
 ## count planned field replicates
 planned_field_dups_2021 <- planned_samples_2021 %>%
-  filter(sample_type == "FIELD DUPLICATE") %>%
+  filter(activity_type == "Quality Control Field Replicate Msr/Obs") %>%
   count() %>%
   as.character()
 
 ## count planned field blanks 
 planned_field_blanks_2021 <- planned_samples_2021 %>%
-  filter(sample_type == "FIELD BLANK") %>%
+  filter(activity_type == "Quality Control Sample-Field Blank") %>%
   count() %>%
   as.character()
 
@@ -1304,7 +1308,7 @@ rm(spring21_planned,summer21_planned)
 
 
 ################ B.) Count ACTUALLY COLLECTED 2021 field blanks/dups #################
-# note total P and total NO3/NO2 from same bottle
+# note bottles vs test. total P and total NO3/NO2 from same bottle
 
 # actual blanks dups 2021
 # source from "dat" (aqwms export structure)
@@ -1317,8 +1321,8 @@ actual_blanks_dups_2021 <- dat %>%
 
 # planned blanks dups 2021
 planned_blanks_dups_2021 <- planned_samples_2021 %>%
-  select(site,activity_start_date,analysis,expected_results,sample_type) %>%
-  filter(!is.na(sample_type)) %>%
+  select(site,activity_start_date,analysis,expected_results,activity_type) %>%
+  filter(activity_type != "Field Msr/Obs") %>%
   # convert planned sample type name and site name to match actual results dataset
   mutate(site = case_when(
     site == "RM 0 - No Name Creek-DUPLICATE" ~ "KR RM 0 NNC",
@@ -1327,38 +1331,58 @@ planned_blanks_dups_2021 <- planned_samples_2021 %>%
     site == "RM 6.5 - Cunningham Park" ~ "KR RM 6.5",
     site == "RM 40 - Bing's Landing" ~ "KR RM 40",
     site == "RM 43 - Upstream of Dow Island" ~ "KR RM 43")) %>%
-  mutate(sample_type = case_when(
-    sample_type == "FIELD DUPLICATE" ~ "Quality Control Field Replicate Msr/Obs",
-    sample_type == "FIELD BLANK" ~ "Quality Control Sample-Field Blank")) %>%
   transform(activity_start_date = mdy(activity_start_date)) %>%
   select(-expected_results) %>%
   rename(monitoring_location_id = site,
-         activity_type = sample_type,
          result_analytical_method_id = analysis) %>%
   mutate(n_planned = 1)
   
-  
-# expected results per analysis is not the sample measure as count... how to rectify
-(z <- left_join(planned_blanks_dups_2021,actual_blanks_dups_2021))
 
-# missing 1 200.7 from spring .. why?! check sheet. answewr: becuase the analysis was not requested on the CoC
 
+# calculate numbers for inline text print
+actual_field_dups_2021 <- actual_blanks_dups_2021 %>%
+  filter(activity_type == "Quality Control Field Replicate Msr/Obs") %>%
+  count(n_actual) %>%
+  as.character()
+
+actual_field_blanks_2021 <- actual_blanks_dups_2021 %>%
+  filter(activity_type == "Quality Control Sample-Field Blank") %>%
+  count(n_actual) %>%
+  as.character()
 
 ```
 
-Table \@ref(tab:planned-dups-blanks) summarizes the intended vs actual analyses performed for field blanks and field duplicates in 2021. Analyses were executed as planned, with the exception of the field replicate for total metals (EPA Analytical Method 200.7 for the KR RM 31 site (Morgan's Landing site) on 2021-05-11. This sample was not analysed for total metals due to a transcription error on the chain of custody form.
+```{r planned-qaqc, echo = F, messages = F, warnings = F}
+library(kableExtra)
 
-book won't build from here; need to qc code chunk starting at 1151
+tbl <- left_join(planned_blanks_dups_2021,actual_blanks_dups_2021)
+
+
+kable(tbl, caption = "2021 Planned vs actual QA/QC results available",
+      col.names = c("Site",
+                    "Date",
+                    "Analysis",
+                    "Sample Type",
+                    "# Planned",
+                    "# Actual"))
+
+```
+
+<br>
+
+From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate sample is missing. The missing sample is for the 200.7 (total metals) analyses on 2021-05-11 ar RM 31 (Morgan's Landing). This error occurred due to a transcription error on the chain of custody form.
+
+###### 2021 Field QA/QC Sample Collection Summary
 
 -   Field duplicates:
 
     -   \# required: ***`r planned_field_dups_2021`***
-    -   \# collected
+    -   \# collected ***`r actual_field_dups_2021`***
 
 -   Field blanks:
 
     -   \# required: ***`r planned_field_blanks_2021`***
-    -   \# collected
+    -   \# collected: ***`r actual_field_blanks_2021`***
 
 -   Other:
 
@@ -1370,8 +1394,33 @@ book won't build from here; need to qc code chunk starting at 1151
 -   RPD goal from QAPP(%): ***Varies by Parameter, See Current QAPP***
 -   View duplicate RPD calculations and a summary table in supporting excel file; including parameters, site names, dates, results, and RPD values: ***Values TBD***
 
-```{r, echo= F}
+```{r, echo = F}
 # generate table of rpd values and make csv downloadable
+
+# general approach:
+# create table with RPD goals from QAPP
+# calculate observed 2021 RPD values
+# compare to goals
+
+# read in list to subset sites with field duplicates, then subsetoverall dataset
+qaqc_sites_2021 <- read_excel("other/input/AQWMS/aqwms_qaqc/aqwms_qaqc_info.xlsx", sheet = "field_dup_sites_2021") %>%
+  remove_empty()
+
+dat_clean <- dat %>%
+  clean_names() 
+
+field_dups_2021 <- inner_join(dat_clean,qaqc_sites_2021)
+
+# retain needed columns and restructure dataframe
+z <- field_dups_2021 %>%
+  select(monitoring_location_id,activity_start_date,activity_type,characteristic_name,result_analytical_method_id,result_value,result_qualifier) %>%
+  pivot_wider(names_from = activity_type,values_from = result_value) %>%
+  clean_names() %>%
+  mutate(rpd_pct = abs((field_msr_obs - quality_control_field_replicate_msr_obs) / field_msr_obs)*100)
+
+# match against standards from QAPP; make cases for where excptions should be addressed (eg for FC; count 1 vs 2 = 50% rpd)
+
+
 ```
 
 ##### In-situ Field Data and Instruments
