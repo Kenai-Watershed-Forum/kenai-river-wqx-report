@@ -418,7 +418,6 @@ rm(analysis_code_matching_table,aqwms_analytical_methods,epa_analysis_codes)
 
 ```
 
-
 ```{r}
 ########################## Miscellaneous Steps #########################################
 
@@ -1145,24 +1144,35 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 
 # This code chunk will prepare values to be used in addressing the data review questions below. 
 
-# The code will be executed here (prior to the review questions) rather than in individual chunks above each individual question, because some of the questions are not sequentially independent. (That is to say, values from multiple questions are needed to answer single questions, sometimes from prior and sometimes from after a particular question. For example in question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #4). Ideally, one day, we would have these questions in the sequence most logical for data analysis.
+# The code will be executed here (prior to the review questions) rather than in individual chunks above each individual question, because some of the questions are not sequentially independent. (That is to say, values from multiple questions are needed to answer single questions, sometimes from prior and sometimes from after a particular question. For example in question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #5). Ideally, one day, we would have these questions in the sequence most logical for data analysis.
 
 # 1.: No calculation needed.
 # 2.: No calculation needed.
 # 3.: No calculation needed.
-# 4.: Calculations needed
+
+###################################### 4. Dataset Completeness ####################################
 
 ## 4.1: Completeness Measure A: "the primary number of samples collected divided by the useable number of samples submitted to ADEC with a goal of 85% completeness."
 
 ## 4.2: Completeness Measure B: "the planned number of samples divided by the useable samples with a goal of 60%."
 
-
+## Include parameter information, number of expected samples, number of collected samples and overall percent completeness
 
 ### calculate values needed for completeness
 
 # general approach: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
 
 ### First: get number of samples (results) actually collected
+### by parameter
+total_samples_collected_2021_summary_param <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
+  clean_names() %>%
+  group_by(result_analytical_method_id,characteristic_name,activity_start_date,activity_type) %>%
+  count() %>%
+  rename(actual_results_n = n) %>%
+  transform(activity_start_date = ymd(activity_start_date)) 
+
+### First: get number of samples (results) actually collected
+### not grouped by parameter
 total_samples_collected_2021_summary <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
   clean_names() %>%
   group_by(result_analytical_method_id,activity_start_date,activity_type) %>%
@@ -1247,7 +1257,8 @@ planned_samples_2021_summary <- planned_samples_2021 %>%
 
 
 # create table of planned vs actual analyses
-planned_actual_analyses_2021 <- left_join(planned_samples_2021_summary,total_samples_collected_2021_summary)
+planned_actual_analyses_2021 <- left_join(planned_samples_2021_summary,total_samples_collected_2021_summary) %>%
+  mutate(pct_diff = ((actual_results_n - expected_results_n) / (actual_results_n + expected_results_n)) * 100)
 
 # note: From the above table we can see that there are deviations between planned and actual results available. These deviations are attributable to two causes:
 
@@ -1259,25 +1270,38 @@ planned_actual_analyses_2021 <- left_join(planned_samples_2021_summary,total_sam
 
 ```
 
-
 1.  Did the project follow the QAPP? ***Yes***. Were there any deviations from the sampling plan? ***Yes. Refer to Individual Answers Below***
 
 2.  Was the data collected representative of environmental conditions? ***Yes***. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
 
 3.  Are site names, dates, and times correct and as expected? ***Yes, after post-season correction*** Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
 
-4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the 2020 QAPP were not collected in 2021.
+4.  Is the dataset complete and did you receive the expected number of results? ***TBD***. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the current QAPP were not collected in 2021.
 
 Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
-
 
 -   Completeness Measure A: (Samples Collected) / (Samples Submitted to ADEC) \*100% = ***%TBD***
 
     -   Project goal: ***85%***
+    -   Calculated project completeness Measure A:
 
 -   Completeness Measure B: (Planned Number of Samples) / (Useable Samples) \* 100% = ***%TBD***
 
     -   Project goal: ***60%***
+    -   Calculate project completeness Measure B:
+    
+
+```{r echo = F}
+xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv', text = "Download All Provisional 2021 Kenai River Baseline Water Quality Monitoring Results, Formatted for AQWMS")
+
+# WORKING HERE 3/15/22
+
+
+
+write.csv()
+```
+
+
 
 
 5.  Were field duplicates, blanks, and/or other QC samples collected as planned? ***Yes, with one exception, see below***
