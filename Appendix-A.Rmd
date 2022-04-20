@@ -25,8 +25,6 @@ Section B10 of the 2020 QAPP describes data management details and responsible p
 
 ### 2021 Water Quality Data
 
-Water quality data generated from the 2021 Kenai River Baseline Water Quality Monitoring (KRBWQM) program will be submitted to the Soldotna office of the Alaska Department of Environmental Conservation (ADEC) in April 2022 using the project-specific spreadsheet template provided by ADEC. The template is intended to prepare data for submission to the [Ambient Water Quality Data Management System](https://www.awqms.com/), the service that ADEC uses to manage water quality data.
-
 ```{r, echo = F}
 xfun::embed_file('other/input/AQWMS/AWQMS_KWF_Baseline_2021.xlsx', text = "Download the AQWMS Water Quality Data Spreadsheet Template")
 ```
@@ -1274,9 +1272,15 @@ planned_actual_analyses_2021 <- left_join(planned_samples_2021_summary,total_sam
 
 1.  [**Did the project follow the QAPP?**]{.ul} *Yes*. [**Were there any deviations from the sampling plan?**]{.ul} *Yes.Refer to Individual Answers Below.*
 
+<br>
+
 2.  [**Was the data collected representative of environmental conditions?**]{.ul} *Yes*. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
 
+<br>
+
 3.  [**Are site names, dates, and times correct and as expected?**]{.ul} *Yes, after post-season correction.* Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
+
+<br>
 
 4.  [**Is the dataset complete and did you receive the expected number of results?**]{.ul} *TBD*. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the current QAPP were not collected in 2021. Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
 
@@ -1299,6 +1303,8 @@ write.csv(planned_actual_analyses_2021, "other/output/field_qa_qc_data/planned_a
 xfun::embed_file("other/output/field_qa_qc_data/planned_actual_analyses_2021.csv", text = "Download Summary Table of Planned vs. Actual Lab Analysis Results for 2021")
 
 ```
+
+<br>
 
 5.  [**Were field duplicates, blanks, and/or other QC samples collected as planned?**]{.ul}*Yes, with one exception, see below*
 
@@ -1404,6 +1410,8 @@ From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate
 
     -   \# required: NA
     -   \# collected: NA
+    
+<br>
 
 6.  [**Are the duplicate sample(s) RPD within range described in QAPP?**]{.ul} *TBD*
 
@@ -1437,8 +1445,9 @@ field_dup_dat_2021 <- inner_join(dat_clean,qaqc_sites_2021)
 
 ###### Address which samples can be evaluated for RPD ##############
 
-  # from DEC 2022 field report: "... a set of paired samples was evaluated for RPD only if: a.) one or both of the samples were above the PQL; AND if b.) one or both of the samples were at least two times the PQL." Prep data to address this.
-  # note: (Practical Quantitation Limit (PQL) = Limit of Quantitation (LOQ))
+  # from DEC 2022 field report: "... a set of paired samples was evaluated for RPD only if: a.) one or both of the samples were above the PQL; AND if b.) one or both of the samples were at least two times the PQL." 
+# Prep data to address these retention standards.
+  # note: (Practical Quantitation Limit (PQL) = Limit of Quantitation (LOQ), identical)
 
 # specify columns needed for RPD analysis
 rpd_cols <- c("monitoring_location_id","activity_start_date","activity_type","characteristic_name","result_analytical_method_id","result_value","result_qualifier","result_detection_limit_type_1","result_detection_limit_value_1")
@@ -1449,10 +1458,6 @@ above_loq <- field_dup_dat_2021 %>%
   mutate(above_loq = case_when(
     result_value > result_detection_limit_value_1 ~ "Y",
     TRUE ~ "N")) 
-#%>%
- # pivot_wider(names_from = activity_type,values_from = result_value) %>%
-  #clean_names() %>%
-  #select(-field_msr_obs, -quality_control_field_replicate_msr_obs)
 
 # is sample 2x LOQ ?
 above_2xloq <- field_dup_dat_2021 %>%
@@ -1460,28 +1465,23 @@ above_2xloq <- field_dup_dat_2021 %>%
   mutate(loq_2x = case_when(
     result_value > 2*result_detection_limit_value_1 ~ "Y",
     TRUE ~ "N")) 
-#%>%
-#  pivot_wider(names_from = activity_type,values_from = result_value) %>%
- # clean_names() %>%
-  #select(-field_msr_obs, -quality_control_field_replicate_msr_obs)
+
 
 # join pass/fail LOQ and 2x LOQ results back to dataframe containing data from dup sites
-
-z <- left_join(field_dup_dat_2021,above_loq) %>%
+rpd_check_dat <- left_join(field_dup_dat_2021,above_loq) %>%
   left_join(above_2xloq) %>%
   select(rpd_cols,above_loq,loq_2x) %>%
-  filter(loq_2x != )
-
   
+  # filter out rpd check data that does not meet LOQ criteria
+  filter(loq_2x == "Y" & above_loq == "Y") %>%
   
+  # 
+  pivot_wider(names_from = activity_type,values_from = result_value) %>%
+  clean_names() %>%
   
-  
-  
-  
-
-  
-    mutate(rpd_pct = ((field_msr_obs - quality_control_field_replicate_msr_obs) / 
-                      ((field_msr_obs + quality_control_field_replicate_msr_obs)/2) ))
+  # 
+  mutate(rpd_pct = ((field_msr_obs - quality_control_field_replicate_msr_obs) / 
+                      ((field_msr_obs + quality_control_field_replicate_msr_obs)/2))*100)
   
   # replace non-detects with zero for Relative Percent Difference (RPD) calculations
   replace(is.na(.), 0) %>%

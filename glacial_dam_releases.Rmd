@@ -1,0 +1,62 @@
+---
+title: "Kenai River glacial dam releases"
+author: "Benjamin Meyer"
+date: "4/20/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+
+# clear environment
+rm(list=ls())
+
+# load packages
+library(tidyverse)
+library(readxl)
+library(openxlsx)
+library(data.table)
+library(stringr)
+library(magrittr)
+library(janitor)
+library(hms)
+library(lubridate)
+library(anytime)
+library(kableExtra)
+```
+
+Access data from https://www.weather.gov/aprfc/gdlData?12
+
+```{r}
+dat <- read.csv("other/input/temp/glacial_dam_releases.csv") %>%
+  transform(release_start_date = mdy(release_start_date),
+            crest_date = mdy(crest_date),
+            release_stage_ds_gage_ft = as.numeric(release_stage_ds_gage_ft),
+            ds_gage_release_flow_cfs = as.numeric(ds_gage_release_flow_cfs),
+            late_peak_stage_ft = as.numeric(late_peak_stage_ft),
+            crest_stage_ds_gage_ft = as.numeric(crest_stage_ds_gage_ft),
+            ds_gage_crest_flow_cfs = as.numeric(ds_gage_crest_flow_cfs),
+            release_volume_ac_ft = as.numeric(release_volume_ac_ft)) %>%
+  mutate(year = year(release_start_date),
+         yday = yday(release_start_date))
+
+```
+
+```{r}
+dat %>%
+  group_by(year) %>%
+  count() %>%
+  ggplot(aes(year,n)) +
+  geom_point(size = 4) +
+  xlab("Glacial Dam Release Year") +
+  ylab("") +
+  ggtitle("Kenai River Glacial Dam Releases") +
+  ylim(0.9, 1.1) +
+  theme(axis.title.y=element_blank(),
+        axis.text.y=element_blank(),
+        axis.ticks.y=element_blank())
+
+```
+Note: no years had more than one glacial release annually.
+
+*Last updated `r Sys.Date()`*
