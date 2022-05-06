@@ -1146,22 +1146,28 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 
 # The code will be executed here (prior to the review questions) rather than in individual chunks above each individual question, because some of the questions are not sequentially independent. (That is to say, values from multiple questions are needed to answer single questions, sometimes from prior and sometimes from after a particular question. For example in question #4, we want to know how many values we excluded from the whole original dataset, which requires decisions based on questions following question #5). Ideally, one day, we would have these questions in the sequence most logical for data analysis.
 
-# 1.: No calculation needed.
-# 2.: No calculation needed.
-# 3.: No calculation needed.
+# Question 1.: No calculations needed.
+# Question 2.: No calculations needed.
+# Question 3.: No calculations needed.
 
-###################################### 4. Dataset Completeness ####################################
+# Question 4. Dataset Completeness: Calculations Needed
+
+
+#################################### Question 4 Data Prep and Calculations #########################################
 
 ## 4.1: Completeness Measure A: "the primary number of samples collected divided by the useable number of samples submitted to ADEC with a goal of 85% completeness."
 
-## 4.2: Completeness Measure B: "the planned number of samples divided by the useable samples with a goal of 60%."
+## 4.2: Completeness Measure B: "the planned number of samples divided by the useable samples (submitted to ADEC) with a goal of 60%."
 
 ## Include parameter information, number of expected samples, number of collected samples and overall percent completeness
 
+### Note: This question relies on the QA/QC process itself to be complete before answering it. We will need to complete all of the following questions before we can answer question 4. Here, we will prepare the numerator values for both of the above definitions of completeness, and acquire the denominator values once QA/QC is complete.
+
 ### calculate values needed for completeness
 
-# general approach: create count table of collected results in original aqwms file. flag those results that are not submitted to ADEC. compare two sets of values to get completeness measure A.
+# general approach: create count table of collected results in originally prepared aqwms file (prior to QA/QC).
 
+### For question 4.1: the number of samples collected
 ### First: get number of samples (results) actually collected
 ### by parameter
 total_samples_collected_2021_summary_param <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
@@ -1171,21 +1177,10 @@ total_samples_collected_2021_summary_param <- read.csv('other/output/aqwms_forma
   rename(actual_results_n = n) %>%
   transform(activity_start_date = ymd(activity_start_date)) 
 
-### First: get number of samples (results) actually collected
-### not grouped by parameter
-total_samples_collected_2021_summary <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
-  clean_names() %>%
-  group_by(result_analytical_method_id,activity_start_date,activity_type) %>%
-  count() %>%
-  rename(actual_results_n = n) %>%
-  transform(activity_start_date = ymd(activity_start_date)) 
 
-# need total samples collected summary too????
 
-### Second: number of samples finalized and submitted to DEC
-#### total_samples_usable_2021 <- get value once all QA/QC processes complete
 
-### number of PLANNED results
+### For question 4.2: number of PLANNED results
 
 #### use kit request data to count "required" (planned) samples
 
@@ -1216,7 +1211,7 @@ planned_samples_2021 <- bind_rows(spring21_planned,summer21_planned) %>%
   # consolidate BTEX analysis types ("blank" analysis is same as regular)
   mutate(analysis = str_replace(analysis,"624 - BTEX trip blank","624 - BTEX")) %>%
   
-  # rename analysis types to match between planned and actual 
+  # rename analysis type names to match between planned and actual 
   mutate(analysis = case_when(
     analysis == "SM4500-NO3E - Nitrogen (Nitrate+Nitrite)" ~ "4500-NO3(F)",
     analysis == "SM4500-PE - Total Phosphorus" ~ "4500-P-E",
@@ -1256,66 +1251,35 @@ planned_samples_2021_summary <- planned_samples_2021 %>%
             expected_results_n = as.numeric(expected_results_n))
 
 
-# create table of planned vs actual analyses
+### create table number of samples (results) actually collected
+### not grouped by parameter, but instead by analysis type
+
+total_samples_collected_2021_summary <- read.csv('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv') %>%
+  clean_names() %>%
+  group_by(result_analytical_method_id,activity_start_date,activity_type) %>%
+  count() %>%
+  rename(actual_results_n = n) %>%
+  transform(activity_start_date = ymd(activity_start_date)) 
+
+
+# create table of planned vs actual ANALYSES
 planned_actual_analyses_2021 <- left_join(planned_samples_2021_summary,total_samples_collected_2021_summary) %>%
   mutate(pct_diff = ((actual_results_n - expected_results_n) / (actual_results_n + expected_results_n)) * 100)
 
-# note: From the above table we can see that there are deviations between planned and actual results available. These deviations are attributable to two causes:
+# note: Put this text in when addressing questions 4.1 and 4.2: From the above table we can see that there are deviations between planned and actual results available. These deviations are attributable to two causes:
 
 # Cause 1: The Spring 2021 Chain of Custody from KWF to SGS was completed erroneously. The COC specified for 200.8 analyses to be complete for all sites (when they should have stopped upstream of Morgan's Landing RM31), and it also specified for 200.7 analyses to stop upstream of Morgan's Landing (when they should have been performed for all sites in the project).
 
 # Cause 2: For Summer 2021, the SGS performed the 200.8 analyses for all 27 analytes available for the method; instead of just the smaller subset of analytes. (E.g., KWF received extra data for free.)
 
-# once data that does not pass QC muster is flagged and removed, we will append an additional column
+# TO DO::: once data that does not pass QC muster is flagged and removed, we will append an additional column(s) to the tables generatede in questions 4.1 and 4.2
 
-```
 
-1.  [**Did the project follow the QAPP?**]{.ul} *Yes*. [**Were there any deviations from the sampling plan?**]{.ul} *Yes.Refer to Individual Answers Below.*
 
-<br>
+################################ Question 5 ################################################
 
-2.  [**Was the data collected representative of environmental conditions?**]{.ul} *Yes*. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
-
-<br>
-
-3.  [**Are site names, dates, and times correct and as expected?**]{.ul} *Yes, after post-season correction.* Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
-
-<br>
-
-4.  [**Is the dataset complete and did you receive the expected number of results?**]{.ul} *TBD*. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the current QAPP were not collected in 2021. Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
-
-    -   Completeness Measure A: (Samples Collected) / (Samples Submitted to ADEC) \*100% = ***%TBD***
-
-        -   Project goal: ***85%***
-        -   Calculated project completeness Measure A: TBD
-
-    -   Completeness Measure B: (Planned Number of Samples) / (Useable Samples) \* 100% = ***%TBD***
-
-        -   Project goal: ***60%***
-
-        -   Calculated project completeness Measure B: TBD
-
-```{r echo = F}
-# save summary table of actual vs planned analyses
-write.csv(planned_actual_analyses_2021, "other/output/field_qa_qc_data/planned_actual_analyses_2021.csv", row.names = F)
-
-# embed for download
-xfun::embed_file("other/output/field_qa_qc_data/planned_actual_analyses_2021.csv", text = "Download Summary Table of Planned vs. Actual Lab Analysis Results for 2021")
-
-```
-
-<br>
-
-5.  [**Were field duplicates, blanks, and/or other QC samples collected as planned?**]{.ul}*Yes, with one exception, see below*
-
-```{r , echo = F, message = F, warning = F}
-# How many field blanks, field duplicates, and other QC samples were planned vs. collected?
-
-################ A.) Count PLANNED 2021 field blanks/dups #################
-
-# see existing table created to address question #4, "planned_samples_2021"
-
-### make available for download? ... "planned sample collection 2021"
+# Question 5: Calculations needed
+# "Were field duplicates, blanks, and/or other QC samples collected as planned?"
 
 ## count planned field replicates
 planned_field_dups_2021 <- planned_samples_2021 %>%
@@ -1353,7 +1317,7 @@ planned_blanks_dups_2021 <- planned_samples_2021 %>%
 
 
 ################ B.) Count ACTUALLY COLLECTED 2021 field blanks/dups #################
-# note bottles vs test. total P and total NO3/NO2 from same bottle
+# note bottles vs test.... total P and total NO3/NO2 analyses are from same bottle
 
 # actual blanks dups 2021
 # source from "dat" (aqwms export structure)
@@ -1376,12 +1340,156 @@ actual_field_blanks_2021 <- actual_blanks_dups_2021 %>%
   count() %>%
   as.character()
 
-```
-
-```{r planned-qaqc, echo = F, messages = F, warnings = F}
-
 # save summary table of actual vs planned blanks and dups
 planned_actual_blanks_dups_2021 <- left_join(planned_blanks_dups_2021,actual_blanks_dups_2021)
+
+
+
+
+
+######################################### Question 6 ###############################################################
+
+# Are the duplicate sample(s) RPD within range described in QAPP?
+
+# generate table of rpd values and make csv downloadable
+
+# consider: generate an excel file with multiple tabs that shows process fo winnowing based on criteria, progressing from one tab to next 
+
+# general approach:
+# create table with RPD goals from QAPP
+# calculate observed 2021 RPD values
+# compare to goals
+
+# subset field data from sites with field duplicates in 2021, then subset overall dataset
+qaqc_sites_2021 <- read_excel("other/input/AQWMS/aqwms_qaqc/aqwms_qaqc_info.xlsx", sheet = "field_dup_sites_2021") %>%
+  remove_empty()
+dat_clean <- dat %>%
+  clean_names() 
+field_dup_dat_2021 <- inner_join(dat_clean,qaqc_sites_2021)
+
+# specify and retain columns needed for RPD analysis
+rpd_cols <- c("monitoring_location_id","activity_start_date","activity_type","characteristic_name","result_analytical_method_id","result_value","result_qualifier","result_detection_limit_type_1","result_detection_limit_value_1")
+field_dup_dat_2021 %<>% select(one_of(rpd_cols))
+
+
+## Address which samples can be evaluated for RPD ##############
+
+# from DEC 2022 field report: "... a set of paired samples was evaluated for RPD only if: 
+## a.) one or both of the samples were above the PQL; AND if 
+## b.) one or both of the samples were at least two times the PQL." 
+
+# Prep data to address these retention standards.
+
+# note: (Practical Quantitation Limit (PQL) = Limit of Quantitation (LOQ), identical)
+
+# is sample above LOQ?
+above_loq <- field_dup_dat_2021 %>%
+  mutate(above_loq = case_when(
+    result_value > result_detection_limit_value_1 ~ "Y",
+    TRUE ~ "N")) 
+
+# is sample 2x LOQ ?
+above_2xloq <- field_dup_dat_2021 %>%
+  select(rpd_cols) %>%
+  mutate(loq_2x = case_when(
+    result_value > 2*result_detection_limit_value_1 ~ "Y",
+    TRUE ~ "N")) 
+
+
+# join pass/fail LOQ and 2x LOQ results back to dataframe containing data from dup sites
+rpd_check_dat <- left_join(field_dup_dat_2021,above_loq) %>%
+  left_join(above_2xloq) %>%
+  select(rpd_cols,above_loq,loq_2x)
+
+# save above dataframe as Tab 1 in excel file to show winnowing process. write 2021 sgs site names to a new excel file
+rpd_calcs_doc_path <- "other/output/field_qa_qc_data/rpd_calcs_2021.xlsx"
+write.xlsx(rpd_check_dat, rpd_calcs_doc_path, sheetName = "all_dup_sample_results") 
+
+
+# filter out rpd results that do not meet LOQ criteria
+rpd_check_dat %<>% filter(loq_2x == "Y" & above_loq == "Y") 
+
+# save results that meet criteria in new spreadsheet tab in same workbook!
+wb <- loadWorkbook(rpd_calcs_doc_path)
+addWorksheet(wb,"loq_pass_dup_sample_results")
+writeData(wb,"loq_pass_dup_sample_results",rpd_check_dat)
+saveWorkbook(wb,rpd_calcs_doc_path,overwrite = TRUE)
+
+
+# calculate RPD values and save in new spreadsheet tab
+
+z <- rpd_check_dat %>%
+  # pivot dataframe to widee
+  pivot_wider(names_from = activity_type,values_from = result_value) %>%
+  clean_names() %>%
+  # calculate RPD values
+  mutate(rpd_pct = ((field_msr_obs - quality_control_field_replicate_msr_obs) / 
+                      ((field_msr_obs + quality_control_field_replicate_msr_obs)/2))*100) 
+
+
+  
+  # replace non-detects with zero for Relative Percent Difference (RPD) calculations (DON'T DO THIS... AT THIS POINTIN WINNOWING, MISSING OBS ARE BECAUSE SAMPL WASNT COLLECTED, SEE NOT ON TRANSCRIPTION ERROR EARLIER)
+  #replace(is.na(.), 0) 
+
+
+  
+  
+ # mutate_at(vars(rpd_pct), ~replace(., is.nan(.), 0))
+  
+  # replace "Inf" in RPD results with "100% difference" values
+ # mutate(rpd_pct = case_when(
+  #  is.infinite(rpd_pct), "100"
+  #))
+
+# NEXT::: match against standards from QAPP; advocate for where exceptions should be addressed (eg for FC; count 1 vs 2 = 50% rpd)
+
+
+
+
+
+
+```
+
+1.  [**Did the project follow the QAPP?**]{.ul} *Yes*. [**Were there any deviations from the sampling plan?**]{.ul} *Yes. Refer to Individual Answers Below.*
+
+<br>
+
+2.  [**Was the data collected representative of environmental conditions?**]{.ul} *Yes*. Notes: Study design is intended to create two single-day snapshots across a wide geographical area of the Kenai River watershed.
+
+<br>
+
+3.  [**Are site names, dates, and times correct and as expected?**]{.ul} *Yes, after post-season correction.* Notes: In 2021 Kenai Watershed Forum used pre-printed labels on all sample bottles, reducing opportunity for field and lab transcription errors. Remaining site name transcription errors were corrected in post-season data review.
+
+<br>
+
+4.  [**Is the dataset complete and did you receive the expected number of results?**]{.ul} *TBD*. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the current QAPP were not collected in 2021. Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
+
+    -   Completeness Measure A: (Samples Collected) / (Samples Submitted to ADEC) \*100% = ***%TBD***
+
+        -   Project goal: ***85%***
+        -   Calculated project completeness Measure A: TBD
+
+    -   Completeness Measure B: (Planned Number of Samples) / (Useable Samples) \* 100% = ***%TBD***
+
+        -   Project goal: ***60%***
+
+        -   Calculated project completeness Measure B: TBD
+
+```{r echo = F}
+# save summary table of actual vs planned analyses
+write.csv(planned_actual_analyses_2021, "other/output/field_qa_qc_data/planned_actual_analyses_2021.csv", row.names = F)
+
+# embed for download
+xfun::embed_file("other/output/field_qa_qc_data/planned_actual_analyses_2021.csv", text = "Download Summary Table of Planned vs. Actual Lab Analysis Results for 2021")
+
+```
+
+<br>
+
+5.  [**Were field duplicates, blanks, and/or other QC samples collected as planned?**]{.ul}*Yes, with one exception, see below*
+
+
+```{r planned-qaqc, echo = F, messages = F, warnings = F}
 
 write.csv(planned_actual_blanks_dups_2021,"other/output/field_qa_qc_data/planned_actual_blanks_dups_2021.csv", row.names = F)
 
@@ -1415,91 +1523,18 @@ From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate
 
 6.  [**Are the duplicate sample(s) RPD within range described in QAPP?**]{.ul} *TBD*
 
--   RPD goal from QAPP(%): ***Varies by Parameter, See Current QAPP***
+-   RPD (Relative Percent Difference) goal from QAPP(%): ***Varies by Parameter, See Current QAPP***
 
 -   View duplicate RPD calculations and a summary table in supporting excel file; including parameters, site names, dates, results, and RPD values: ***Values TBD***
 
-    -   Note: from ADEC 2022, *"Estimated values (detected at levels lower than the practical quantitation limit (PQL)) were treated as non-detects for the purpose of this analysis. A set of paired samples was evaluated for RPD only if:*
+    -   Note: we applied standards from ADEC to determine which observations may be evaluated in RPD calculations. From ADEC 2022, *"Estimated values (detected at levels lower than the practical quantitation limit (PQL)) were treated as non-detects for the purpose of this analysis. A set of paired samples was evaluated for RPD only if:*
 
         -   *one or both of the samples were above the PQL;*
 
         -   *one or both of the samples were at least two times the PQL."*
 
-```{r, echo = F}
-# generate table of rpd values and make csv downloadable
-
-# general approach:
-# create table with RPD goals from QAPP
-# calculate observed 2021 RPD values
-# compare to goals
-
-# subset field data from sites with field duplicates in 2021, then subset overall dataset
-qaqc_sites_2021 <- read_excel("other/input/AQWMS/aqwms_qaqc/aqwms_qaqc_info.xlsx", sheet = "field_dup_sites_2021") %>%
-  remove_empty()
-
-dat_clean <- dat %>%
-  clean_names() 
-
-field_dup_dat_2021 <- inner_join(dat_clean,qaqc_sites_2021)
 
 
-###### Address which samples can be evaluated for RPD ##############
-
-  # from DEC 2022 field report: "... a set of paired samples was evaluated for RPD only if: a.) one or both of the samples were above the PQL; AND if b.) one or both of the samples were at least two times the PQL." 
-# Prep data to address these retention standards.
-  # note: (Practical Quantitation Limit (PQL) = Limit of Quantitation (LOQ), identical)
-
-# specify columns needed for RPD analysis
-rpd_cols <- c("monitoring_location_id","activity_start_date","activity_type","characteristic_name","result_analytical_method_id","result_value","result_qualifier","result_detection_limit_type_1","result_detection_limit_value_1")
-
-# is sample above LOQ?
-above_loq <- field_dup_dat_2021 %>%
-  select(rpd_cols) %>%
-  mutate(above_loq = case_when(
-    result_value > result_detection_limit_value_1 ~ "Y",
-    TRUE ~ "N")) 
-
-# is sample 2x LOQ ?
-above_2xloq <- field_dup_dat_2021 %>%
-  select(rpd_cols) %>%
-  mutate(loq_2x = case_when(
-    result_value > 2*result_detection_limit_value_1 ~ "Y",
-    TRUE ~ "N")) 
-
-
-# join pass/fail LOQ and 2x LOQ results back to dataframe containing data from dup sites
-rpd_check_dat <- left_join(field_dup_dat_2021,above_loq) %>%
-  left_join(above_2xloq) %>%
-  select(rpd_cols,above_loq,loq_2x) %>%
-  
-  # filter out rpd check data that does not meet LOQ criteria
-  filter(loq_2x == "Y" & above_loq == "Y") %>%
-  
-  # 
-  pivot_wider(names_from = activity_type,values_from = result_value) %>%
-  clean_names() %>%
-  
-  # 
-  mutate(rpd_pct = ((field_msr_obs - quality_control_field_replicate_msr_obs) / 
-                      ((field_msr_obs + quality_control_field_replicate_msr_obs)/2))*100)
-  
-  # replace non-detects with zero for Relative Percent Difference (RPD) calculations
-  replace(is.na(.), 0) %>%
-
- %>%
-  
-  
-  mutate_at(vars(rpd_pct), ~replace(., is.nan(.), 0))
-  
-  # replace "Inf" in RPD results with "100% difference" values
-  mutate(rpd_pct = case_when(
-    is.infinite(rpd_pct), "100"
-  ))
-
-# match against standards from QAPP; make cases for where excptions should be addressed (eg for FC; count 1 vs 2 = 50% rpd)
-
-
-```
 
 ##### In-situ Field Data and Instruments
 
