@@ -1579,6 +1579,9 @@ From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate
 *Subsequent steps in the "Database Prep" and "Database Import" phases are conducted by ADEC staff. See the above Data Evaluation Checklist Template for details.*
 
 ```{r, eval = F, echo = F}
+
+# sketches of examining WQP and AQWMS data
+
 # check out example from other WQP download
 z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
   #filter(CharacteristicName == "Fecal Coliform")
@@ -1601,21 +1604,22 @@ z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
 
 ```
 
-```{r, notes, include = F}
 
-# course of action
+```{r, eval = F, echo = F}
 
-# uplift 2021 data
+# sketch
 
-# audit existing data in WQX
+# Question: can data from 2014 - 2020 entered manually by R McCormick by adapted to the EPA template, or do we need to start from scratch?
 
-# confirm with DEC that they are addressing data 2017 - 2020
+# examine this question separately by lab source (SWWTP, SGS, Taurianen)
 
-# attempt to download missing data from  AQWMS, then upload to EPA WQX
+# more detailed question: can we get all the column names applied to the RM data file as we have from the 2021 read-in
 
-# if not available, reshape data from shared drive to uplift to EPA WQX (big task)
+# examine 2021 fecal coliform data column names
 
 ```
+
+
 
 <br>
 
