@@ -249,7 +249,6 @@ write.xlsx(sample_types, "other/input/AQWMS/sample_type_abbreviations.xlsx")
 # Upon visual inspection of site names, we can see that the location names in the AQWMS template differ slightly from the place names in the SGS report (spelling and name inconsistencies).
 
 
-
 # 3/28/2022 - A note on addressing "Duplicate" designations. In QA/QC data review in March 2022 the following was clarified through trial and error: we must make a careful distinction between "Field Duplicates" and "Lab duplicates" when preparing this data. The sample names contain info about whether a result is from a "Field Duplicate," e.g., two field collections made at the same location/day/time. However the ALS lab also created "Lab Duplicates," which are not from the same sites as field duplicates, and designates these as "DUP1" in the "sample_type" column.
 
 # See AQWMS Activity Type column assign distinctions
@@ -282,6 +281,9 @@ dat %<>%
     sample == "RM0-No Name Creek  Diss" ~ "RM0-No Name Creek",
     TRUE ~ sample)) 
   
+# z <- dat %>%
+#  select(sample,sample_type,sample_condition)
+
   
 # We need to remove white spaces, apostrophes, and dashes; because join functions such as "left_join" are often uncooperative with these types of string characters. We will need to use joins with site names in next steps.
   
@@ -1005,7 +1007,11 @@ analyte_abbrev <- read.csv("other/input/AQWMS/analytes_list_manual_edit.csv")
 colnames(analyte_abbrev) <- c("analyte","analyte_abbreviation")
 dat %<>%
   left_join(analyte_abbrev)
+```
 
+
+
+```{r}
 ## b.) sample_condition abbreviations
 dat %<>%
   mutate(sample_condition_abbrv = case_when(
@@ -1014,6 +1020,15 @@ dat %<>%
 
 
 
+########################## TO DO
+
+# note 5/18/2022 -- some samples from 5/11/2021 no name creek have "PS" fro sample type but have "Field Duplicate" for sample_condition. need to fix. 
+
+```
+
+
+
+```{r}
 
 ############ g.) prepare final format ###############################
 
@@ -1041,7 +1056,7 @@ dat %<>%
     `Activity Type` = case_when(
       sample_condition == "Field Duplicate" ~ "Quality Control Field Replicate Msr/Obs",
       sample_condition == "Blank" ~ "Quality Control Sample-Trip Blank",
-      sample_type == "TB" ~ "Quality Control Sample-Field Blank",
+      sample_type == "TB" ~ "Quality Control Sample-Trip Blank",
       TRUE ~ "Field Msr/Obs"),
     # All samples are surface grab samples. Depths are assigned across the board here as 6 inches (~15 cm) 
     `Activity Depth/Height Measure` = 15,
@@ -1122,6 +1137,9 @@ write.csv(dat,"other/output/aqwms_formatted_results/2021_kwf_baseline_results_aq
 ```{r, echo = F}
 xfun::embed_file('other/output/aqwms_formatted_results/2021_kwf_baseline_results_aqwms.csv', text = "Download All Provisional 2021 Kenai River Baseline Water Quality Monitoring Results, Formatted for AQWMS")
 
+# check unique activity types
+
+
 ```
 
 ------------------------------------------------------------------------
@@ -1179,7 +1197,6 @@ total_samples_collected_2021_summary_param <- read.csv('other/output/aqwms_forma
 
 
 
-
 ### For question 4.2: number of PLANNED results
 
 #### use kit request data to count "required" (planned) samples
@@ -1203,12 +1220,15 @@ planned_samples_2021 <- bind_rows(spring21_planned,summer21_planned) %>%
   filter(site != "Spare Kit") %>%
   mutate(sample_type = case_when(
     grepl("DUPLICATE",site, ignore.case = TRUE) ~ "FIELD DUPLICATE",
-    grepl("blank",analysis_1, ignore.case = TRUE) ~ "FIELD BLANK"
+    grepl("blank",analysis_1, ignore.case = TRUE) ~ "TRIP BLANK"
   )) %>%
   pivot_longer(values_to = "analysis", cols = c("analysis_1","analysis_2")) %>%
   filter(!is.na(analysis)) %>%
   
   # consolidate BTEX analysis types ("blank" analysis is same as regular)
+  
+  # 5/24/2022 need to distinguish trip blanks
+  
   mutate(analysis = str_replace(analysis,"624 - BTEX trip blank","624 - BTEX")) %>%
   
   # rename analysis type names to match between planned and actual 
@@ -1232,7 +1252,7 @@ planned_samples_2021 <- bind_rows(spring21_planned,summer21_planned) %>%
     analysis == "8260D" ~ 6)) %>%
   mutate(activity_type = case_when(
     sample_type == "FIELD DUPLICATE" ~ "Quality Control Field Replicate Msr/Obs",
-    sample_type == "FIELD BLANK" ~ "Quality Control Sample-Field Blank",
+    sample_type == "TRIP BLANK" ~ "Quality Control Sample-Trip Blank",
     TRUE ~ "Field Msr/Obs")) %>%
   select(-sample_type)
 
@@ -1288,8 +1308,8 @@ planned_field_dups_2021 <- planned_samples_2021 %>%
   as.character()
 
 ## count planned field blanks 
-planned_field_blanks_2021 <- planned_samples_2021 %>%
-  filter(activity_type == "Quality Control Sample-Field Blank") %>%
+planned_trip_blanks_2021 <- planned_samples_2021 %>%
+  filter(activity_type == "Quality Control Sample-Trip Blank") %>%
   count() %>%
   as.character()
 
@@ -1335,8 +1355,8 @@ actual_field_dups_2021 <- actual_blanks_dups_2021 %>%
   count() %>%
   as.character()
 
-actual_field_blanks_2021 <- actual_blanks_dups_2021 %>%
-  filter(activity_type == "Quality Control Sample-Field Blank") %>%
+actual_tripd_blanks_2021 <- actual_blanks_dups_2021 %>%
+  filter(activity_type == "Quality Control Sample-Trip Blank") %>%
   count() %>%
   as.character()
 
@@ -1368,7 +1388,15 @@ dat_clean <- dat %>%
 field_dup_dat_2021 <- inner_join(dat_clean,qaqc_sites_2021)
 
 # specify and retain columns needed for RPD analysis
-rpd_cols <- c("monitoring_location_id","activity_start_date","activity_type","characteristic_name","result_analytical_method_id","result_value","result_qualifier","result_detection_limit_type_1","result_detection_limit_value_1")
+rpd_cols <- c("monitoring_location_id",
+              "activity_start_date",
+              "activity_type",
+              "characteristic_name",
+              "result_analytical_method_id",
+              "result_value",
+              "result_qualifier",
+              "result_detection_limit_type_1",
+              "result_detection_limit_value_1")
 field_dup_dat_2021 %<>% select(one_of(rpd_cols))
 
 
@@ -1428,7 +1456,9 @@ rpd_values <- rpd_check_dat %>%
   mutate(`rpd_%` = ((field_msr_obs - quality_control_field_replicate_msr_obs) / 
                       ((field_msr_obs + quality_control_field_replicate_msr_obs)/2))*100) %>%
   mutate(`rpd_%` = abs(round(`rpd_%`,2))) %>%
-  arrange(monitoring_location_id,activity_start_date)
+  arrange(monitoring_location_id,activity_start_date) %>%
+  # remove blank values
+  filter(!is.na(`rpd_%`))
   
 
 # save rpd results in new spreadsheet tab in same excel workbook!
@@ -1438,11 +1468,11 @@ writeData(wb,"rpd_values",rpd_values)
 saveWorkbook(wb,rpd_calcs_doc_path,overwrite = TRUE)
 
 
-
+# WORKING HERE 5/24/2022
 
 # NEXT::: match against standards from QAPP; advocate for where exceptions should be addressed (eg for FC; count 1 vs 2 = 50% rpd)
-# 5/6/2022 - IN PROCESS OF SETTING UP TABLE FOR RPD ASSESSMENT STANDARDS
-# NEED TO SET UP DATA ENTRY FOR 2013 - 2016 FOR JACK... see analytica request in shared at agency baseline/miscellaneous... create a couple practice examples
+# 5/24/2022 - IN PROCESS OF SETTING UP TABLE FOR RPD ASSESSMENT STANDARDS
+# SET UP DATA ENTRY FOR 2013 - 2016 FOR JACK... in progress
 
 #download all edd files from als global and sgs engage
 
@@ -1466,16 +1496,16 @@ saveWorkbook(wb,rpd_calcs_doc_path,overwrite = TRUE)
 
 4.  [**Is the dataset complete and did you receive the expected number of results?**]{.ul} *TBD*. Notes: we acquired the expected number of results in 2021 sampling events. All sites described in the QAPP were visited twice in 2021, and all water sample collections were successfully conducted. However most intrinsic water quality parameters mentioned in the current QAPP were not collected in 2021. Data evaluation is currently in progress and the values below are current as of `r Sys.Date()`.
 
-    -   Completeness Measure A: (Samples Collected) / (Samples Submitted to ADEC) \*100% = ***%TBD***
+    -   Completeness Measure A = (Samples Collected) / (Samples Submitted to ADEC) \*100% 
 
         -   Project goal: ***85%***
-        -   Calculated project completeness Measure A: TBD
+        -   Calculated project completeness Measure A: Varies by parameter, see downloadable file below.
 
-    -   Completeness Measure B: (Planned Number of Samples) / (Useable Samples) \* 100% = ***%TBD***
+    -   Completeness Measure B = (Planned Number of Samples) / (Useable Samples) \* 100% 
 
         -   Project goal: ***60%***
 
-        -   Calculated project completeness Measure B: TBD
+        -   Calculated project completeness Measure B: Varies by parameter, see downloadable file below.
 
 ```{r echo = F}
 # save summary table of actual vs planned analyses
@@ -1496,13 +1526,13 @@ xfun::embed_file("other/output/field_qa_qc_data/planned_actual_analyses_2021.csv
 write.csv(planned_actual_blanks_dups_2021,"other/output/field_qa_qc_data/planned_actual_blanks_dups_2021.csv", row.names = F)
 
 # embed for download
-xfun::embed_file("other/output/field_qa_qc_data/planned_actual_blanks_dups_2021.csv", text = "Download Summary Table of Planned vs. Actual Field Blank and Field Duplicate Samples for 2021")
+xfun::embed_file("other/output/field_qa_qc_data/planned_actual_blanks_dups_2021.csv", text = "Download Summary Table of Planned vs. Actual Trip Blank and Field Duplicate Samples for 2021")
 
 ```
 
 <br>
 
-From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate sample is missing. The missing sample is for the 200.7 (total metals) analyses on 2021-05-11 ar RM 31 (Morgan's Landing). This error occurred due to a transcription error on the chain of custody form.
+From the above downloadable file, "Planned vs. Actual Trip Blank and Field Duplicate Samples for 2021," we observe that data from one field duplicate sample is missing. The missing sample is for the 200.7 (total metals) analyses on 2021-05-11 ar RM 31 (Morgan's Landing). This error occurred due to a transcription error on the chain of custody form.
 
 ###### 2021 Field QA/QC Sample Collection Summary
 
@@ -1511,10 +1541,10 @@ From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate
     -   \# required: ***`r planned_field_dups_2021`***
     -   \# collected ***`r actual_field_dups_2021`***
 
--   Field blanks:
+-   Trip blanks:
 
-    -   \# required: ***`r planned_field_blanks_2021`***
-    -   \# collected: ***`r actual_field_blanks_2021`***
+    -   \# required: ***`r planned_trip_blanks_2021`***
+    -   \# collected: ***`r actual_trip_blanks_2021`***
 
 -   Other:
 
@@ -1578,52 +1608,74 @@ From table \@ref(tab:planned-qaqc) we observe that data from one field duplicate
 
 *Subsequent steps in the "Database Prep" and "Database Import" phases are conducted by ADEC staff. See the above Data Evaluation Checklist Template for details.*
 
+
+```{r, echo = F, eval = F}
+
+# final notes
+
+# we need to make sure 2021 site names/info match those existing in WQP; currently they do not -- where did the new ones come from (see wqp sketch at final chunk.)
+
+```
+
+
+
+
+
+
+
+
 ```{r, eval = F, echo = F}
 
 # sketches of examining WQP and AQWMS data
 
 # check out example from other WQP download
-z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
+#z1 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
   #filter(CharacteristicName == "Fecal Coliform")
  # select(ActivityStartDate,CharacteristicName) %>%
-  clean_names() %>%
-  select()
-  transform(activity_start_date = ymd(activity_start_date)) %>%
-  group_by(characteristic_name) %>%
-  summarise(min_date = min(activity_start_date),
-            max_date = max(activity_start_date))
+ # clean_names() %>%
+#  transform(activity_start_date = ymd(activity_start_date)) %>%
+ # group_by(characteristic_name) %>%
+#  summarise(min_date = min(activity_start_date),
+ #           max_date = max(activity_start_date))
 
 ### 1st step:::: make sure that monitoring list locations matches those currently match those in DEC AQWMS database (AWQMS public login: https://awqms2.goldsystems.com/Login.aspx, username akpublic, no password)
 
-z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
-  clean_names() %>%
-  select(result_detection_condition_text,)
-  select(characteristic_name, result_sample_fraction_text,result_analytical_method_method_name) %>%
-  distinct()
+#z2 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
+#  clean_names() %>%
+#  select(result_detection_condition_text,)
+#  select(characteristic_name, result_sample_fraction_text,result_analytical_method_method_name) %>%
+#  distinct()
+  
+  
+# sites
+#z3 <- read.csv("other/input/wqp_data/station.csv") %>%
+#  clean_names()
 
+# get all unique analytes
+# check out example from other WQP download
+#z4 <- read.csv("other/input/wqp_data/narrowresult.csv") %>%
+  #filter(CharacteristicName == "Fecal Coliform")
+ # select(ActivityStartDate,CharacteristicName) %>%
+#  clean_names() %>%
+#  select(characteristic_name) %>%
+#  distinct()
+
+#write.csv(z4,"other/output/temp.csv")
+#  transform(activity_start_date = ymd(activity_start_date)) %>%
+#  group_by(characteristic_name) %>%
+#  summarise(min_date = min(activity_start_date),
+#            max_date = max(activity_start_date))
+#  
+  
 
 ```
 
-
-```{r, eval = F, echo = F}
-
-# sketch
-
-# Question: can data from 2014 - 2020 entered manually by R McCormick by adapted to the EPA template, or do we need to start from scratch?
-
-# examine this question separately by lab source (SWWTP, SGS, Taurianen)
-
-# more detailed question: can we get all the column names applied to the RM data file as we have from the 2021 read-in
-
-# examine 2021 fecal coliform data column names
-
-```
 
 
 
 <br>
 
-```{r, other notes, include = F}
+```{r, include = F, eval = F}
 
 # ultimately, would like to set up auto query of EPA WQX so this report updates automatically (github actions or other methods...?); eg see front matter guts of https://geocompr.robinlovelace.net/.
 
