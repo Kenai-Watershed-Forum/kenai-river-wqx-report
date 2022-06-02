@@ -476,6 +476,15 @@ xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/Fecal
 
 ```
 
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/SWWTP_Spring_2021_TCC_FC.jpg', text = "Download Spring 2021 Fecal Coliform Chain of Custody")
+```
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/Taurianen/FC_CoC_Taurianen_Summer2021.pdf', text = "Download Summer 2021 Fecal Coliform Chain of Custody")
+```
+
 <details>
 
 <summary>
@@ -743,6 +752,15 @@ xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/KRWF TSS 
 ```{r, echo = F}
 xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/KRWF TSS MONITORING 07-28-21.xlsx', text = "Download Original Summer 2021 Total Suspended Solids Results from SWWTP.xlsx")
 ```
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/spring_2021_wqx_data/SWWTP/SWWTP_Spring_2021_TCC_FC.jpg', text = "Download Spring 2021 Total Suspended Solids Chain of Custody")
+```
+
+```{r, echo = F}
+xfun::embed_file('other/input/2021_wqx_data/summer_2021_wqx_data/SWWTP/TSS_CoC_SWWTP_Summer2021.pdf', text = "Download Summer 2021 Total Suspended Solids Chain of Custody")
+```
+
 
 <details>
 
@@ -1106,8 +1124,9 @@ dat %<>%
     # remove columns that were mutated to a new name
     ,.keep = "unused")
 
-   
-# next, we want top retain just those columns listed in the AQWMS template
+# Save a copy of the whole dataframe with all results and parameters prior to reducing it to just the column subset. We will use this later in QA/QC analyses.
+
+# next, for our AQWMS export, we want to retain just those columns listed in the AQWMS template
 # found solution to this problem here: https://gist.github.com/djhocking/62c76e63543ba9e94ebe
 
 # get all column names from AQWMS template
@@ -1159,6 +1178,15 @@ xfun::embed_file('other/documents/AQWMS_documents/Data_Evaluation_Checklist_Temp
 #### Pre-Database
 
 ##### Overall Project Success
+
+<details>
+
+<summary>
+
+*Show/Hide Code used to Evaluate Overall Project Success*
+
+</summary>
+
 
 ```{r, echo = F, message = F}
 
@@ -1369,7 +1397,7 @@ planned_actual_blanks_dups_2021 <- left_join(planned_blanks_dups_2021,actual_bla
 
 
 
-######################################### Question 6 ###############################################################
+######################################### Question 6 #######################################################
 
 # Are the duplicate sample(s) RPD within range described in QAPP?
 
@@ -1488,6 +1516,22 @@ saveWorkbook(wb,rpd_calcs_doc_path,overwrite = TRUE)
 
 
 
+#######################################################################################
+###    Question  17. Were preservation, hold time and temperature requirements met? ###
+#######################################################################################
+
+holdtime_dat <- all_dat %>%
+  select(`Monitoring Location ID`,`Activity ID`,`Result Analytical Method ID`,`Characteristic Name`,`Activity Start Date`,`Activity Start Time`,rec_date,rec_time) %>%
+  clean_names()
+
+# join with sample holding times
+holding_times <- read.csv("other/input/AQWMS/sample_holding_times.csv") %>%
+  transform(holding_time_hours = as_hms(anytime(holding_time_hours)))
+
+
+# calc time from field sample to lab analysis
+
+
 ###download all edd files from als global and sgs engage
 
 
@@ -1495,6 +1539,11 @@ saveWorkbook(wb,rpd_calcs_doc_path,overwrite = TRUE)
 
 
 ```
+
+</details>
+
+<br>
+
 
 1.  [**Did the project follow the QAPP?**]{.ul} *Yes*. [**Were there any deviations from the sampling plan?**]{.ul} *Yes. Refer to Individual Answers Below.*
 
@@ -1607,11 +1656,11 @@ xfun::embed_file("other/output/field_qa_qc_data/rpd_calcs_2021.xlsx", text = "Do
 
 14. Do the laboratory reports match the COC and requested methods? ***Yes***. Are same methods used throughout? ***Yes***.
 
-15. Are the number of samples on the laboratory reports the same as on the COC? ***TBD***.
+15. Are the number of samples on the laboratory reports the same as on the COC? ***Yes***.
 
-16. Is a copy of the COC included with the laboratory reports? ***Yes***. GET COC FOR SWWTP 2021... embed with earlier docs...
+16. Is a copy of the COC included with the laboratory reports? ***Yes***. 
 
-17. Were preservation, hold time and temperature requirements met? ***Yes***. **Can provide calculation table to verify if necessary**.
+17. Were preservation, hold time and temperature requirements met? ***Yes***. **Can provide calculation table to verify if necessary**. DO CALCULATIONS
 
 18. Are there any project specific concerns (e.g. total v. dissolved, MST, etc)? ***Yes. Communication with the ADEC office in Winter 2022 indicates the need to slightly modify field practices with relation to dissolved metals. These practices include a.) filtering samples in lab rather than in the field, and b.) incorporating a field blank for dissolved metals. These practices are integrated into the project as of summer 2022 and will be refleccted in the updated QAPP***.
 
