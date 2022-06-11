@@ -1765,6 +1765,11 @@ matrix_spike_recovery_fails <- matrix_spike_limits %>%
   nrow() %>%
   as.numeric()
 
+# generate table of specific failed samples
+matrix_spike_recovery_fails_tbl <- matrix_spike_limits %>%
+  filter(rec_limit_pass == "N") 
+write.csv(matrix_spike_recovery_fails_tbl,"other/output/lab_qaqc_data/matrix_spike_recovery_fails.csv")
+
 ```
 
 </details>
@@ -1775,7 +1780,36 @@ The following discrepancies were identified in the results from SGS laboratories
 
 A total of `r matrix_spike_recovery_fails` matrix spike or matrix spike duplicate samples are outside of QC criteria. The limit of recovery range for the analyte "Total Nitrate/Nitrite-N" is 90% - 110%. For these matrix spike measurements outside of the QC criteria, recovery levels range from 112% - 118%.
 
+```{r matrix-spikes, echo = F, messages = F, warnings = F}
+# embed for download
+xfun::embed_file("other/output/lab_qaqc_data/matrix_spike_recovery_fails.csv", text = "Download Matrix Spike Recovery Values Exceeding Threshold for Spring and Summer 2021 Field Samples")
+
+```
+
 No additional lab QA/QC anomalies for any other parameters were noted by any laboratories contracted in 2021, including lab duplicates and lab blanks. Additional details are available upon request at [hydrology\@kenaiwatershed.org](mailto:hydrology@kenaiwatershed.org){.email}.
+
+
+###### Total vs Dissolved Metals
+We will verify that the quantity of total metals is less than that of dissolved metals... [in progress]
+
+```{r, echo = F}
+
+z <- dat %>%
+  filter(`Result Analytical Method ID` == c("200.7","200.8")) %>%
+  filter(!is.na(`Result Value`)) %>%
+  group_by(`Monitoring Location ID`,`Activity Start Date`,`Result Unit`,`Result Analytical Method ID`) %>%
+  summarise(method_sum = sum(`Result Value`)) %>%
+  mutate(method_sum_ug = case_when(
+    `Result Unit`== "mg/L" ~ method_sum/1000,
+    TRUE ~ method_sum
+  )) %>%
+  ungroup() %>%
+  select(-`Result Unit`,-method_sum) %>%
+  pivot_wider(names_from = `Result Analytical Method ID`,values_from = method_sum_ug)
+
+# note mg vs ug
+```
+
 
 21. Is any laboratory data rejected and why? ***Yes, see question 6 on Relative Percent Difference values***.
 
